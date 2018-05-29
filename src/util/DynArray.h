@@ -10,6 +10,7 @@ class Slice {
 	u32 _size;
 
 public:
+	inline Slice() : _begin{nullptr}, _size{0} {}
 	inline Slice(T* begin, T* end) : _begin{begin}, _size{i64_to_u32(end - begin)} {}
 	Slice(const Slice& other) = delete; // Don't want to lose const-ness
 
@@ -43,7 +44,9 @@ class DynArray {
 
 public:
 	DynArray(u32 len) : DynArray{new T[len], len} {}
-	DynArray(const DynArray& other) = delete;
+	DynArray(const DynArray& other __attribute__((unused))) : _slice{} {
+		assert(false); //should be optimized away!
+	}
 	DynArray(DynArray&& other) = default;
 	~DynArray() {
 		::operator delete(_slice.begin());

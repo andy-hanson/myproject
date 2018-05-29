@@ -37,5 +37,5 @@ add_executable(myproject
 	util/DynArray.h
 	util/read_png.cpp
 	util/io.h
-	util/io.cpp util/read_obj.h util/read_obj.cpp)
+	util/io.cpp util/read_obj.h util/read_obj.cpp process_model.cpp process_model.h model.h)
 target_link_libraries(myproject glfw ${PNG_LIBRARY})

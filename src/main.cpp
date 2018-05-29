@@ -16,9 +16,17 @@
 #include "./util/Matrix.h"
 #include "./util/read_png.h"
 #include "./util/read_obj.h"
+#include "./model.h"
+#include "./process_model.h"
 
 namespace {
-	struct ShaderProgram { GLuint id; };
+	struct ShaderProgram {
+		GLuint id;
+
+		void use() const {
+			glUseProgram(id);
+		}
+	};
 
 	GLint to_glint(unsigned long l) {
 		assert(l < std::numeric_limits<GLint>::max());
@@ -30,100 +38,32 @@ namespace {
 		u32 n_vertices;
 
 		VBO(const VBO& other) = delete;
-		//VBO(VBO&& other) = default;
-	};
+		VBO(VBO&& other) = default;
 
-	struct VAO { GLuint id; };
-
-
-	// Note: every member must be a float, since we pass this to glVertexAttribPointer.
-	struct VertexAttributes {
-		glm::vec3 pos;
-		glm::vec3 color;
-		//glm::vec2 texture_coords;
-	} __attribute__((packed));
-
-
-	struct Stroke {
-		glm::vec3 pos;
-		glm::vec3 color;
-	};
-
-	struct Triangle {
-		glm::vec3 p0;
-		glm::vec3 p1;
-		glm::vec3 p2;
-	};
-
-	struct Normals {
-		glm::vec3 n0;
-		glm::vec3 n1;
-		glm::vec3 n2;
-	};
-
-	Triangle face_vertices(const Face& face, const Model& m) {
-		return { m.vertices[face.vertex_0], m.vertices[face.vertex_1], m.vertices[face.vertex_2] };
-	};
-
-	__attribute__((unused))
-	Normals face_normals(const Face& face, const Model& m) {
-		return { m.normals[face.normal_0], m.normals[face.normal_1], m.normals[face.normal_2] };
-	}
-
-	double triangle_area(const Triangle& t) {
-		glm::dvec3 va = t.p1 - t.p0;
-		glm::dvec3 vb = t.p2 - t.p0;
-		return glm::cross(va, vb).length() * 0.5;
-	}
-
-	__attribute__((unused))
-	double compute_total_area(const Model& m) {
-		double total = 0;
-		for (const Face& face : m.faces)
-			total += triangle_area(face_vertices(face, m));
-		return total;
-	}
-
-	__attribute__((unused))
-	uint round_to_uint(double d) {
-		assert(d >= 0);
-		return static_cast<uint>(round(d));
-	}
-
-	//TODO:MOVE
-	DynArray<VertexAttributes> convert_model(const Model& m) {
-		DynArray<VertexAttributes> out { m.faces.size() * 3 };
-		uint i = 0;
-		for (const Face& face : m.faces) {
-			Triangle tri = face_vertices(face, m);
-			//TODO: interpolate between vertex normals -- needs adjacent faces
-			//Normals normals = face_normals(face, m);
-			const Material& material = m.materials[face.material];
-			//TODO: use the other attributes!
-			Color color = material.kd;
-
-			out[i++] = { tri.p0, color.vec3() };
-			out[i++] = { tri.p1, color.vec3() };
-			out[i++] = { tri.p2, color.vec3() };
+		void bind() const {
+			glBindBuffer(GL_ARRAY_BUFFER, id);
 		}
-		assert(i == out.size());
-		return out.copy_slice(out.slice()); //TODO: don't copy
+
+		~VBO() {
+			glDeleteBuffers(1, &id);
+		}
 	};
 
-	//If changing this, must also change the call to `glVertexAttribPointer`
-	VBO create_and_bind_vertex_buffer(const Model& model) {
-		/*VertexAttributes Vertices[3] = {
-			{ { -1.0f, -1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },//, { 0.0f, 0.0f } },
-			{ {  1.0f, -1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },//, { 1.0f, 0.0f } },
-			{ {  0.0f,  1.0f, 0.0f }, { 1.0f, 1.0f, 1.0f } },//, { 0.0f, 1.0f } },
-		};*/
-		DynArray<VertexAttributes> vertices = convert_model(model);
+	struct VAO {
+		GLuint id;
+		void bind() const {
+			glBindVertexArray(id);
+		}
+	};
+
+	VBO create_and_bind_vertex_buffer(const DynArray<VertexAttributes>& vertices) {
 		GLuint vbo_id;
 		glGenBuffers(1, &vbo_id);
 		assert(vbo_id != 0);
-		glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
-		glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(VertexAttributes), vertices.begin(), GL_STATIC_DRAW);
-		return { vbo_id, vertices.size() };
+		VBO vbo { vbo_id, vertices.size() };
+		vbo.bind();
+		glBufferData(GL_ARRAY_BUFFER, vbo.n_vertices * sizeof(VertexAttributes), vertices.begin(), GL_STATIC_DRAW);
+		return vbo;
 	}
 
 	GLuint add_shader(ShaderProgram shader_program, const std::string& shader_source, GLenum ShaderType) {
@@ -156,14 +96,18 @@ namespace {
 
 		Shaders(const Shaders& other) = delete;
 		Shaders(Shaders&& other) = default;
+
+		void use() const {
+			program.use();
+		}
 	};
-	Shaders compile_shaders() {
+	Shaders compile_shaders(const std::string& name) {
 		ShaderProgram shader_program { glCreateProgram() };
 		assert(shader_program.id != 0);
 
 		std::string cwd = get_current_directory();
-		std::string vs = read_file(cwd + "/shaders/shader.vs");
-		std::string fs = read_file(cwd + "/shaders/shader.fs");
+		std::string vs = read_file(cwd + "/shaders/" + name + ".vs");
+		std::string fs = read_file(cwd + "/shaders/" + name + ".fs");
 
 		GLuint vertex_shader_id = add_shader(shader_program, vs, GL_VERTEX_SHADER);
 		GLuint fragment_shader_id = add_shader(shader_program, fs, GL_FRAGMENT_SHADER);
@@ -191,7 +135,7 @@ namespace {
 		}
 		assert(success == 1);
 
-		glUseProgram(shader_program.id);
+		shader_program.use();
 
 		return { shader_program, vertex_shader_id, fragment_shader_id };
 	}
@@ -209,7 +153,7 @@ namespace {
 	struct Uniform { GLint id; };
 	struct Uniforms {
 		//Uniform uniColor;
-		Uniform transform;
+		Uniform transform_tri;
 	};
 
 	glm::mat4 total_matrix(float time) {
@@ -232,17 +176,6 @@ namespace {
 	GLsizei u32_to_glsizei(u32 u) {
 		assert(u < std::numeric_limits<GLsizei>::max());
 		return static_cast<GLsizei>(u);
-	}
-
-	void render(const Uniforms& uniforms, const VBO& vbo, float time) {
-		//glUniform3f(uniforms.uniColor.id, time - flo(time), 0.0f, 0.0f);
-		glm::mat4 trans = total_matrix(time);
-		glUniformMatrix4fv(uniforms.transform.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(trans));
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
-
-		glDrawArrays(GL_TRIANGLES, 0, u32_to_glsizei(vbo.n_vertices));
 	}
 
 	GLFWwindow* init_glfw() {
@@ -284,11 +217,13 @@ namespace {
 		//TODO: how to remove the texture when done?
 	}
 
+	//TODO: create all vaos at once instead of one at a time
 	VAO create_and_bind_vao() {
-		GLuint vao;
-		glGenVertexArrays(1, &vao);
-		glBindVertexArray(vao);
-		return VAO { vao };
+		GLuint id;
+		glGenVertexArrays(1, &id);
+		VAO out { id };
+		out.bind();
+		return out;
 	}
 
 	u32 safe_div(u32 a, u32 b) {
@@ -296,8 +231,8 @@ namespace {
 		return a / b;
 	}
 
-	Shaders init_shaders() {
-		Shaders shaders = compile_shaders();
+	Shaders init_shaders(const std::string& name) {
+		Shaders shaders = compile_shaders(name);
 
 		GLuint pos_attrib = to_gluint(glGetAttribLocation(shaders.program.id, "position"));
 		assert(pos_attrib == 0);
@@ -331,70 +266,91 @@ namespace {
 	}
 
 
+	struct VAOInfo {
+		const VAO& vao;
+		const VBO& vbo;
+		const Shaders& shaders;
+		const Uniforms& uniforms;
+	};
+
+	void render(const VAOInfo& vao_info_tris, const VAOInfo& vao_info_dots, float time) {
+		//glUniform3f(uniforms.uniColor.id, time - flo(time), 0.0f, 0.0f);
+		glm::mat4 trans = total_matrix(time);
+
+
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+		glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
+
+		// In the tri pass: set stencil buffer to "42" wherever we draw a pixel.
+		int object_id = 42; // TODO
+		glStencilOp(/*stencil fail*/ GL_REPLACE, /*stencil pass, depth fail*/ GL_REPLACE, /*stencil pass, depth pass*/ GL_REPLACE);
+		glStencilFunc(GL_ALWAYS, object_id, 0xff);
+
+		//tris
+		vao_info_tris.vao.bind();
+		vao_info_tris.shaders.use();
+		glUniformMatrix4fv(vao_info_tris.uniforms.transform_tri.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(trans));
+		vao_info_tris.vbo.bind();
+		glDrawArrays(GL_TRIANGLES, 0, u32_to_glsizei(vao_info_tris.vbo.n_vertices));
+
+		glClear(GL_DEPTH_BUFFER_BIT);
+
+		// In the dot pass: We should only draw if the stencil buffer was drawn to.
+		// Not sure why another glStencilOp call is necessary...
+		glStencilOp(/*stencil fail*/ GL_ZERO, /*stencil pass, depth fail*/ GL_ZERO, /*stencil pass, depth pass*/ GL_ZERO);
+		glStencilFunc(GL_EQUAL, object_id, 0xff);
+
+		//TODO:DOTS
+		vao_info_dots.vao.bind();
+		vao_info_dots.shaders.use();
+		glUniformMatrix4fv(vao_info_dots.uniforms.transform_tri.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(trans));
+		vao_info_dots.vbo.bind();
+		glDrawArrays(GL_POINTS, 0, u32_to_glsizei(vao_info_dots.vbo.n_vertices));
+		//vbo_dots.bind();
+		//glDrawArrays(GL_POINTS, 0, u32_to_glsizei(vbo_dots.n_vertices));
+	}
+
 	void play_game(const Model& model) {
+		RenderableModel renderable_model = convert_model(model);
+
 		GLFWwindow* window = init_glfw();
 		init_glew();
 
-		VAO vao __attribute__((unused)) = create_and_bind_vao();
+		VAO vao_tris = create_and_bind_vao();
+		VBO vbo_tris = create_and_bind_vertex_buffer(renderable_model.tris);
+		Shaders shaders_tri = init_shaders("tri");
+		VAOInfo vao_info_tris { vao_tris, vbo_tris, shaders_tri, Uniforms { get_uniform(shaders_tri, "u_transform") } };
 
-		VBO vbo = create_and_bind_vertex_buffer(model);
-
-		Shaders shaders = init_shaders();
+		VAO vao_dots = create_and_bind_vao();
+		VBO vbo_dots = create_and_bind_vertex_buffer(renderable_model.dots);
+		Shaders shaders_dot = init_shaders("dot");
+		VAOInfo vao_info_dots { vao_dots, vbo_dots, shaders_dot, Uniforms { get_uniform(shaders_dot, "u_transform") } };
 
 		glEnable(GL_DEPTH_TEST); //TODO: do this closer to where it's needed, and pair with glDIsable
+		glEnable(GL_STENCIL_TEST);
+		glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
 
 		//load_texture();
 		//glUniform1i(get_uniform(shaders, "tex").id, 0);
 
-		Uniforms uniforms { /*get_uniform(shaders, "u_triangleColor"),*/ get_uniform(shaders, "u_transform") };
 
 		float time = 0;
 		while (!glfwWindowShouldClose(window)) {
 			time += 0.01;
-			render(uniforms, vbo, time);
+			render(vao_info_tris, vao_info_dots, time);
 			glfwSwapBuffers(window);
 			glfwPollEvents();
 		}
 
-		free_shaders(shaders);
-
-		//TODO: destructor
-		glDeleteBuffers(1, &vbo.id);
+		//TODO:DTOR
+		free_shaders(shaders_tri);
+		free_shaders(shaders_dot);
 
 		//TODO: free VAO
 
 		glfwDestroyWindow(window);
 		glfwTerminate();
 	}
-
-	//todo:move
-	/*void gen_strokes(const Model& m) {
-		double total_area = compute_total_area(m);
-
-		double density = m.vertices.size() / total_area;
-
-		double vertices_owed = 0;
-
-		for (const Face& face : m.faces) {
-			Triangle tri = face_vertices(face, m);
-			//TODO: interpolate between vertex normals -- needs adjacent faces
-			Normals normals = face_normals(face, m);
-			const Material& material = m.materials[face.material];
-
-			double area = triangle_area(tri);
-
-			vertices_owed += area * density;
-			uint n_face_points = round_to_uint(vertices_owed);
-			vertices_owed -= n_face_points;
-
-			for (uint i = n_face_points; i != 0; --i) {
-				//Get the material here
-
-				//random_point_normal_uv_in_triangle(tri, normals, textures);
-			}
-		}
-	}*/
-
 }
 
 int main() {
