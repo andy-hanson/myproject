@@ -2,13 +2,13 @@
 
 out lowp vec4 outColor;
 
-uniform lowp vec3 u_triangleColor;
-uniform lowp sampler2D tex;
+//uniform lowp vec3 u_triangleColor;
+//uniform lowp sampler2D tex;
 
 in lowp vec3 frag_color;
-in lowp vec2 frag_texCoord;
+//in lowp vec2 frag_texCoord;
 
 void main() {
-	lowp vec4 tex_color = texture(tex, frag_texCoord);
-    outColor = vec4(tex_color.r + u_triangleColor.r, tex_color.g + frag_color.g, tex_color.b + frag_color.b, 1.0);
+	//lowp vec4 tex_color = texture(tex, frag_texCoord);
+    outColor = vec4(frag_color.r, frag_color.g, frag_color.b, 1.0);
 }
