@@ -1,27 +1,25 @@
 #include "./read_png.h"
 
-#define PNG_DEBUG 3
+#define PNG_DEBUG 3 // TODO: #ifdef DEBUG
 #include <png.h>
+#include "./assert.h"
 #include "./DynArray.h"
 #include "./int.h"
 
 Matrix<uint32_t> png_texture_load(const char* file_name) {
 	png_byte header[8];
 
-	FILE *fp = fopen(file_name, "rb");
-	assert(fp);
+	FILE *fp = assert_not_null(fopen(file_name, "rb"));
 
 	const uint HEADER_BYTES = 8;
 
 	fread(header, 1, HEADER_BYTES, fp);
 
-	assert(!png_sig_cmp(header, 0, HEADER_BYTES));
+	check(!png_sig_cmp(header, 0, HEADER_BYTES));
 
-	png_structp png_ptr = png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
-	assert(png_ptr);
-	png_infop info_ptr = png_create_info_struct(png_ptr);
-	png_infop end_info = png_create_info_struct(png_ptr);
-	assert(info_ptr && end_info);
+	png_structp png_ptr = assert_not_null(png_create_read_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr));
+	png_infop info_ptr = assert_not_null(png_create_info_struct(png_ptr));
+	png_infop end_info = assert_not_null(png_create_info_struct(png_ptr));
 
 	// init png reading
 	png_init_io(png_ptr, fp);
@@ -41,8 +39,8 @@ Matrix<uint32_t> png_texture_load(const char* file_name) {
 
 	// Row size in bytes. glTexImage2d requires rows to be 4-byte aligned.
 	uint32_t rowbytes = u64_to_u32(png_get_rowbytes(png_ptr, info_ptr));
-	assert(rowbytes % 4 == 0); // opengl requires this
-	assert(rowbytes == width * 4); // r, g, b, a
+	check(rowbytes % 4 == 0); // opengl requires this
+	check(rowbytes == width * 4); // r, g, b, a
 	static_assert(sizeof(uint32_t) == sizeof(png_byte) * 4);
 
 	Matrix<uint32_t> image_data { width, height };

@@ -39,5 +39,5 @@ add_executable(myproject
 	util/DynArray.h
 	util/read_png.cpp
 	util/io.h
-	util/io.cpp util/read_obj.h util/read_obj.cpp process_model.cpp process_model.h model.h vendor/readerwriterqueue/atomicops.h vendor/readerwriterqueue/readerwriterqueue.h shaders.h shaders.cpp util/math.h util/float.h)
+	util/io.cpp util/read_obj.h util/read_obj.cpp process_model.cpp process_model.h model.h vendor/readerwriterqueue/atomicops.h vendor/readerwriterqueue/readerwriterqueue.h shaders.h shaders.cpp util/math.h util/float.h util/read_wav.h util/audio_file.h util/read_wav.cpp util/read_ogg.h util/read_ogg.cpp util/assert.h util/audio.h util/audio.cpp util/Slice.h RenderableModel.h)
 target_link_libraries(myproject glfw soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})

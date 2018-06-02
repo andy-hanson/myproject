@@ -4,31 +4,7 @@
 #include <vector>
 #include "./int.h"
 
-template <typename T>
-class Slice {
-	const T* _begin;
-	u32 _size;
-
-public:
-	inline Slice() : _begin{nullptr}, _size{0} {}
-	inline Slice(const T* begin, u32 size) : _begin{begin}, _size{size} {}
-	inline Slice(const T* begin, const T* end) : _begin{begin}, _size{i64_to_u32(end - begin)} {}
-
-	inline u32 size() const {
-		return _size;
-	}
-
-	inline const T& operator[](u32 i) const {
-		assert(i < size());
-		return *(_begin + i);
-	}
-
-	using const_iterator = const T*;
-	inline const_iterator begin() const { return _begin; }
-	inline const_iterator end() const { return _begin + _size; }
-
-	inline bool is_empty() { return _size == 0; }
-};
+#include "./Slice.h"
 
 template <typename T>
 class MutableSlice {
@@ -51,11 +27,11 @@ public:
 	inline iterator end() { return _begin + _size; }
 
 	inline T& operator[](u32 i) {
-		assert(i < size());
+		check(i < size());
 		return *(_begin + i);
 	}
 	inline const T& operator[](u32 i) const {
-		assert(i < size());
+		check(i < size());
 		return *(_begin + i);
 	}
 
@@ -72,7 +48,7 @@ class DynArray {
 public:
 	DynArray(u32 len) : DynArray{new T[len], len} {}
 	DynArray(const DynArray& other __attribute__((unused))) : _slice{} {
-		assert(false); //should be optimized away!
+		todo(); // should be optimized away!
 	}
 	DynArray(DynArray&& other) {
 		_slice = other._slice;
@@ -99,8 +75,10 @@ public:
 		return _slice[i];
 	}
 
-	inline typename Slice<T>::const_iterator begin() const { return _slice.begin(); }
-	inline typename Slice<T>::const_iterator end() const { return _slice.end(); }
+	inline const T* begin() const { return _slice.begin(); }
+	inline const T* end() const { return _slice.end(); }
+	inline T* begin() { return _slice.begin(); }
+	inline T* end() { return _slice.end(); }
 	inline u32 size() const { return _slice.size(); }
 };
 
@@ -127,12 +105,12 @@ inline Slice<T> vec_to_slice(std::vector<T>& v) {
 //TODO:MOVE
 template <typename T>
 u8 index_of(const Slice<T>& slice, const T& value) {
-	u8 size = uint_to_u8(slice.size());
+	u8 size = u32_to_u8(slice.size());
 	for (u8 i = 0; i != size; ++i) {
 		if (slice[i] == value)
 			return i;
 	}
-	assert(false);
+	unreachable();
 }
 
 //TODO:MOVE

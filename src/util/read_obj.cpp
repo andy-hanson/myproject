@@ -1,7 +1,8 @@
-#include "./read_obj.h"
-
 #include <sstream>
 #include <vector>
+
+#include "./assert.h"
+#include "./read_obj.h"
 
 namespace {
 
@@ -13,20 +14,20 @@ namespace {
 
 	void expect_str(std::istringstream& s, const char* expected) {
 		std::string str = read_str(s);
-		assert(str == expected);
+		check(str == expected);
 	};
 
 	u8 read_u8(std::istringstream& s) {
-		uint u;
+		u64 u;
 		s >> u;
-		return uint_to_u8(u);
+		return u64_to_u8(u);
 	}
 
 	// Some indices are 1-based in the .obj file, but we want 0-based.
 	u8 read_u8_minus_one(std::istringstream& s) {
 		u8 u = read_u8(s);
-		assert(u != 0);
-		return u - 1;
+		check(u != 0);
+		return static_cast<u8>(u - 1);
 	}
 
 	float read_float(std::istringstream& s) {
@@ -48,13 +49,13 @@ namespace {
 
 	char read_char(std::istringstream& s) {
 		int i = s.get();
-		assert(i >= std::numeric_limits<char>::min() && i <= std::numeric_limits<char>::max());
+		check(i >= std::numeric_limits<char>::min() && i <= std::numeric_limits<char>::max());
 		return static_cast<char>(i);
 	}
 
 	void expect_char(std::istringstream& s, char expected) {
 		char c = read_char(s);
-		assert(c == expected);
+		check(c == expected);
 	}
 
 	struct FacePart { u8 vertex; u8 normal; };
@@ -84,10 +85,10 @@ namespace {
 
 	void skip_comments(std::istringstream& s) {
 		char c = read_char(s);
-		assert(c == '#');
+		check(c == '#');
 		skip_line(s);
 		c = read_char(s);
-		assert(c == '#');
+		check(c == '#');
 		skip_line(s);
 	}
 
@@ -98,7 +99,7 @@ namespace {
 		while (!s.eof()) {
 			std::string newmtl = read_str(s);
 			if (newmtl != "newmtl") {
-				assert(newmtl == "");
+				check(newmtl == "");
 				break;
 			}
 
@@ -158,7 +159,7 @@ Model parse_model(const char* mtl_source, const char* obj_source) {
 		if (str == "v") {
 			vertices.push_back(read_vec3(s));
 		} else {
-			assert(str == "vn");
+			check(str == "vn");
 			normals.push_back(read_vec3(s));
 			break;
 		}
@@ -168,7 +169,7 @@ Model parse_model(const char* mtl_source, const char* obj_source) {
 		if (str == "vn") {
 			normals.push_back(read_vec3(s));
 		} else {
-			assert(str == "usemtl");
+			check(str == "usemtl");
 			set_current_material();
 			break;
 		}
@@ -186,7 +187,7 @@ Model parse_model(const char* mtl_source, const char* obj_source) {
 		else if (str.empty())
 			break;
 		else
-			assert(false);
+			todo();
 	}
 
 	return { vec_to_dyn_array(materials), vec_to_dyn_array(vertices), vec_to_dyn_array(normals), vec_to_dyn_array(faces) };

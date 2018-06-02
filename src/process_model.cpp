@@ -2,6 +2,7 @@
 
 #include <glm/vec3.hpp>
 #include <glm/gtc/matrix_transform.hpp> // cross
+#include <random>
 
 namespace {
 	struct Stroke {
@@ -51,11 +52,14 @@ namespace {
 		return static_cast<float>(sqrt(static_cast<double>(f)));
 	}
 
+	using Random = std::mt19937_64;
+
 	struct PointNormal { glm::vec3 point; glm::vec3 normal; };
 	// Uses barycentric coordinates
-	PointNormal random_point_normal_in_triangle(const Triangle& tri, const Normals& normals) {
-		float rand0 = random(); //TODO:BETTER random
-		float rand1 = random();
+	PointNormal random_point_normal_in_triangle(const Triangle& tri, const Normals& normals, Random& rand) {
+		std::uniform_real_distribution<> dis(0.0, 1.0);
+		float rand0 = static_cast<float>(dis(rand)); //TODO:BETTER random
+		float rand1 = static_cast<float>(dis(rand));
 		float alpha = 1 - float_sqrt(rand0);
 		float beta = rand1 * (1 - alpha);
 		float gamma = 1 - alpha - beta;
@@ -65,11 +69,24 @@ namespace {
 		return { point, normal };
 	}
 
-	__attribute__((unused))
-	DynArray<VertexAttributes> gen_strokes(const Model& m) {
+	float rand_range(float min, float max, Random& rand) {
+		std::uniform_real_distribution<> dis(static_cast<double>(min), static_cast<double>(max));
+		return static_cast<float>(dis(rand));
+	}
+
+	float max(float a, float b) { return a > b ? a : b; }
+	float min(float a, float b) { return a < b ? a : b; }
+
+	//TODO: use hsv
+	Color random_color_near(Color c, Random& rand) {
+		auto fluctuate = [&](float f) { return rand_range(max(f - 0.1f, 0), min(f + 0.1f, 1.0), rand); };
+		return Color { fluctuate(c.r), fluctuate(c.g), fluctuate(c.b) };
+	}
+
+	DynArray<VertexAttributes> gen_strokes(const Model& m, Random& rand) {
 		double total_area = compute_total_area(m);
 
-		u32 n_strokes = m.vertices.size();
+		u32 n_strokes = m.vertices.size() * 3; // TODO: this is arbitrary...
 
 		double density = n_strokes / total_area;
 
@@ -91,9 +108,9 @@ namespace {
 			vertices_owed -= n_face_points;
 
 			for (uint i = n_face_points; i != 0; --i) {
-				PointNormal pn = random_point_normal_in_triangle(tri, normals);
+				PointNormal pn = random_point_normal_in_triangle(tri, normals, rand);
 				//todo: normal should be in attributes
-				out[out_i++] = VertexAttributes { pn.point, material.kd.vec3() };
+				out[out_i++] = VertexAttributes { pn.point, random_color_near(material.kd, rand).vec3() };
 			}
 		}
 
@@ -101,7 +118,6 @@ namespace {
 		return out;
 	}
 
-//TODO:MOVE
 	DynArray<VertexAttributes> get_triangles(const Model& m) {
 		DynArray<VertexAttributes> out { m.faces.size() * 3 };
 		uint i = 0;
@@ -122,8 +138,7 @@ namespace {
 	};
 }
 
-//TODO:MOVE
 RenderableModel convert_model(const Model& m) {
-	//TODO: second call should be gen_strokes (for now, we'll just draw dots on the vertices to debug)
-	return { get_triangles(m), get_triangles(m) };
+	Random rand;
+	return { get_triangles(m), gen_strokes(m, rand) };
 };
