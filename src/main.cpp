@@ -328,25 +328,24 @@ namespace {
 			perror("error opening file");
 			assert(false);
 		}
+
 		int err = ov_open(file, &vf, nullptr, 0);
 		assert(err == 0);
 
-		// coments
+		uint N_CHANNELS = 2;
+
+		ogg_int64_t total_samples = ov_pcm_total(&vf, /*set to -1 to mean -- all streams*/ -1);
+		u32 total_floats = i64_to_u32(total_samples) * N_CHANNELS;
+
 		{
-			char** ptr = ov_comment(&vf, -1)->user_comments;
 			vorbis_info* vi = ov_info(&vf, -1);
-			while (*ptr) {
-				fprintf(stderr,"%s\n",*ptr);
-				++ptr;
-			}
-			fprintf(stderr,"\nBitstream is %d channel, %ldHz\n",vi->channels,vi->rate);
-			fprintf(stderr,"\nDecoded length: %ld samples\n", ov_pcm_total(&vf,-1));
-			fprintf(stderr,"Encoded by: %s\n\n",ov_comment(&vf,-1)->vendor);
+			assert(vi->rate == 44100);
+			assert(vi->channels == uint_to_int(N_CHANNELS));
 		}
 
-		//TODO: get length ahead of time?
-		std::vector<float> res;
-		res.reserve(10000);
+		DecodedFile res { { total_floats } };
+		MutableSlice<float> floats = res.floats.slice();
+		float* next_out_float = floats.begin();
 
 		for (;;) {
 			const uint N_shorts = 4096;
@@ -363,38 +362,37 @@ namespace {
 				uint_to_int(word_size),
 				/*signed*/ true,
 				&current_section);
-			if (ret == 0) {
-				/* EOF */
-				break;
-			} else if (ret < 0) {
-				// error in the stream
-				assert(false);
+			if (ret <= 0) {
+				if (ret == 0)
+					break; // EOF
+				assert(false); // error in the stream
 			} else {
-				if (current_section != 0) {
+				if (current_section != 0)
 					// we don't bother dealing with sample rate changes, etc, but you'll have to
 					todo();
-				}
 
 				// Note: "ov_read() will decode at most one vorbis packet per invocation, so the value returned will generally be less than length."
 				uint n_chars_read = long_to_uint(ret);
 				uint n_shorts_read = safe_div(n_chars_read, word_size);
-				assert(n_chars_read < N_chars);
+				assert(n_chars_read < N_chars); // actually may be equal, but I wanted to make sure buffer is big enough
 
-				const float AMPLITUDE = std::numeric_limits<i16>::max();
+				constexpr float AMPLITUDE = 1.0f / std::numeric_limits<i16>::max();
 				for (uint i = 0; i != n_shorts_read; ++i) {
-					float f = static_cast<float>(buf[i]) / AMPLITUDE;
-					res.push_back(f);
+					float f = static_cast<float>(buf[i]) * AMPLITUDE;
+					*next_out_float = f;
+					++next_out_float;
 				}
 			}
 		}
 
 		ov_clear(&vf);
 
-		return { vec_to_dyn_array(res) };
+		assert(next_out_float == floats.end());
+		return res;
 	}
 
 	template <typename Cb>
-	auto foo(const char* desc, Cb cb) {
+	auto print_time(const char* desc, Cb cb) {
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
 		auto res = cb();
 		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
@@ -407,8 +405,8 @@ namespace {
 //TODO: now play the wav data into soundio...
 
 int main() {
-	DecodedFile wavvy = foo("wav", []() { return read_wav(); });
-	DecodedFile vorby = foo("ogg", []() { return read_vorbis("/home/andy/CLionProjects/myproject/audio/awe.ogg"); });
+	DecodedFile wavvy = print_time("wav", []() { return read_wav(); });
+	DecodedFile vorby = print_time("ogg", []() { return read_vorbis("/home/andy/CLionProjects/myproject/audio/awe.ogg"); });
 
 	bool prefer_wav = false;
 
