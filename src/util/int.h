@@ -25,3 +25,28 @@ inline u8 uint_to_u8(uint u) {
 	assert(u <= std::numeric_limits<uint8_t>::max());
 	return static_cast<u8>(u);
 }
+
+inline uint int_to_uint(int i) {
+	assert(i >= 0);
+	return static_cast<uint>(i);
+}
+inline uint long_to_uint(long l) {
+	assert(l >= 0 && l <= std::numeric_limits<uint>::max());
+	return static_cast<uint>(l);
+}
+
+inline u64 i64_to_u64(i64 i) {
+	assert(i >= 0);
+	return static_cast<u64>(i);
+}
+
+inline int uint_to_int(uint u) {
+	assert(u <= std::numeric_limits<int>::max());
+	return static_cast<int>(u);
+}
+
+inline u32 safe_div(u32 a, u32 b) {
+	assert(b != 0);
+	assert(a % b == 0);
+	return a / b;
+}

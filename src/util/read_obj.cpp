@@ -77,31 +77,6 @@ namespace {
 		faces.push_back(Face { material, c.vertex, d.vertex, a.vertex, c.normal, d.normal, a.normal });
 	}
 
-	template <typename T>
-	Slice<T> vec_to_slice(std::vector<T>& v) {
-		T* begin = &v[0];
-		T* end = begin + v.size();
-		return { begin, end };
-	}
-
-	//TODO:MOVE
-	template <typename T>
-	DynArray<T> vec_to_dyn_array(std::vector<T>& v) {
-		return DynArray<T>::copy_slice(vec_to_slice(v));
-	}
-
-	//TODO:MOVE
-	template <typename T>
-	u8 index_of(const Slice<T>& slice, const T& value) {
-		u8 size = uint_to_u8(slice.size());
-		for (u8 i = 0; i != size; ++i) {
-			if (slice[i] == value)
-				return i;
-		}
-		assert(false);
-	}
-
-
 	void skip_line(std::istringstream& s) {
 		std::string str;
 		getline(s, str);

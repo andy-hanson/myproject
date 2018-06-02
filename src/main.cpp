@@ -8,136 +8,36 @@
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp> // glm::value_ptr
 #include <vector>
 #include <sstream>
 
 #include "./util/io.h"
+#include "./util/float.h"
 #include "./util/Matrix.h"
-#include "./util/read_png.h"
 #include "./util/read_obj.h"
 #include "./model.h"
 #include "./process_model.h"
 
+#include <soundio/soundio.h>
+
+#include <cassert>
+#include <sndfile.h>
+#include <cstdint>
+#include <iostream>
+#include <vector>
+#include <thread>
+
+#include "./vendor/readerwriterqueue/readerwriterqueue.h"
+#include "./shaders.h"
+
+#include "vorbis/codec.h"
+#include "vorbis/vorbisfile.h"
+
 namespace {
-	struct ShaderProgram {
-		GLuint id;
-
-		void use() const {
-			glUseProgram(id);
-		}
-	};
-
-	GLint to_glint(unsigned long l) {
-		assert(l < std::numeric_limits<GLint>::max());
-		return static_cast<GLint>(l);
-	}
-
-	struct VBO {
-		GLuint id;
-		u32 n_vertices;
-
-		VBO(const VBO& other) = delete;
-		VBO(VBO&& other) = default;
-
-		void bind() const {
-			glBindBuffer(GL_ARRAY_BUFFER, id);
-		}
-
-		~VBO() {
-			glDeleteBuffers(1, &id);
-		}
-	};
-
-	struct VAO {
-		GLuint id;
-		void bind() const {
-			glBindVertexArray(id);
-		}
-	};
-
-	VBO create_and_bind_vertex_buffer(const DynArray<VertexAttributes>& vertices) {
-		GLuint vbo_id;
-		glGenBuffers(1, &vbo_id);
-		assert(vbo_id != 0);
-		VBO vbo { vbo_id, vertices.size() };
-		vbo.bind();
-		glBufferData(GL_ARRAY_BUFFER, vbo.n_vertices * sizeof(VertexAttributes), vertices.begin(), GL_STATIC_DRAW);
-		return vbo;
-	}
-
-	GLuint add_shader(ShaderProgram shader_program, const std::string& shader_source, GLenum ShaderType) {
-		GLuint shader_id = glCreateShader(ShaderType);
-		assert(shader_id != 0);
-
-		const char* c_str = shader_source.c_str();
-		GLint len = to_glint(shader_source.size());
-		glShaderSource(shader_id, 1, &c_str, &len);
-		glCompileShader(shader_id);
-		GLint success;
-		glGetShaderiv(shader_id, GL_COMPILE_STATUS, &success);
-		if (success == 0) {
-			GLchar InfoLog[1024];
-			glGetShaderInfoLog(shader_id, 1024, nullptr, InfoLog);
-			std::cerr << "Error compiling shader " << std::endl << shader_source << std::endl << InfoLog << std::endl;
-			assert(false);
-		}
-
-		glAttachShader(shader_program.id, shader_id);
-		//TODO: glBindFragDataLocation(shader_program.id, 0, "outColor"); (it's the default though)
-
-		return shader_id;
-	}
-
-	struct Shaders {
-		ShaderProgram program;
-		GLuint vertex;
-		GLuint fragment;
-
-		Shaders(const Shaders& other) = delete;
-		Shaders(Shaders&& other) = default;
-
-		void use() const {
-			program.use();
-		}
-	};
-	Shaders compile_shaders(const std::string& name) {
-		ShaderProgram shader_program { glCreateProgram() };
-		assert(shader_program.id != 0);
-
-		std::string cwd = get_current_directory();
-		std::string vs = read_file(cwd + "/shaders/" + name + ".vs");
-		std::string fs = read_file(cwd + "/shaders/" + name + ".fs");
-
-		GLuint vertex_shader_id = add_shader(shader_program, vs, GL_VERTEX_SHADER);
-		GLuint fragment_shader_id = add_shader(shader_program, fs, GL_FRAGMENT_SHADER);
-
-		GLint success = 0;
-		GLchar error_log[1024];
-
-		glLinkProgram(shader_program.id);
-
-		glGetProgramiv(shader_program.id, GL_LINK_STATUS, &success);
-		GLsizei error_log_length;
-		glGetProgramInfoLog(shader_program.id, sizeof(error_log), &error_log_length, error_log);
-		if (error_log_length != 0) {
-			std::cout << "Error linking shader program: " << error_log << std::endl;
-			assert(false);
-		}
-		assert(success == 1);
-
-		glValidateProgram(shader_program.id);
-		glGetProgramiv(shader_program.id, GL_VALIDATE_STATUS, &success);
-		glGetProgramInfoLog(shader_program.id, sizeof(error_log), &error_log_length, error_log);
-		if (error_log_length != 0) {
-			std::cerr << "Invalid shader program: " << error_log << std::endl;
-			assert(false);
-		}
-		assert(success == 1);
-
-		shader_program.use();
-
-		return { shader_program, vertex_shader_id, fragment_shader_id };
+	//TODO:MOVE
+	__attribute__((noreturn))
+	void todo() {
+		throw "todo";
 	}
 
 	void init_glew() {
@@ -150,164 +50,12 @@ namespace {
 		}
 	}
 
-	struct Uniform { GLint id; };
-	struct Uniforms {
-		//Uniform uniColor;
-		Uniform transform_tri;
-	};
-
-	glm::mat4 total_matrix(float time) {
-		glm::mat4 model = glm::rotate(glm::mat4{}, time * glm::radians(108.0f), glm::vec3(0.0f, 0.0f, 1.0f));
-		glm::mat4 view = glm::lookAt(
-			/*eye*/ glm::vec3(4.0f, 4.0f, 4.0f),
-			/*center*/ glm::vec3(0.0f, 0.0f, 0.0f),
-			/*up*/ glm::vec3(0.0f, 0.0f, 1.0f)
-		);
-		glm::mat4 proj = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 1.0f, 10.0f);
-
-		return proj * view * model;
-	}
-
-	__attribute__((unused))
-	float flo(float f) {
-		return static_cast<float>(floor(static_cast<double>(f)));
-	}
-
-	GLsizei u32_to_glsizei(u32 u) {
-		assert(u < std::numeric_limits<GLsizei>::max());
-		return static_cast<GLsizei>(u);
-	}
-
 	GLFWwindow* init_glfw() {
 		glfwInit();
 		GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", nullptr, nullptr);
 		assert(window != nullptr);
 		glfwMakeContextCurrent(window);
 		return window;
-	}
-
-	GLuint to_gluint(GLint i) {
-		assert(i >= 0);
-		return static_cast<GLuint>(i);
-	}
-
-	struct Texture { GLuint id; };
-
-	//TODO:MOVE
-	GLsizei to_glsizei(uint32_t u) {
-		assert(u < std::numeric_limits<GLsizei>::max());
-		return static_cast<GLsizei>(u);
-	}
-
-	Texture bind_texture(const Matrix<u32>& mat) {
-		// Generate the OpenGL texture object
-		GLuint texture;
-		glGenTextures(1, &texture);
-		glBindTexture(GL_TEXTURE_2D, texture);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, to_glsizei(mat.width()), to_glsizei(mat.height()), 0, GL_RGBA, GL_UNSIGNED_BYTE, mat.raw());
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		return Texture { texture };
-	}
-
-	__attribute__((unused))
-	Texture load_texture() {
-		Matrix<u32> m = png_texture_load((get_current_directory() + "/textures/foo.png").c_str());
-		return bind_texture(m);
-		//TODO: how to remove the texture when done?
-	}
-
-	//TODO: create all vaos at once instead of one at a time
-	VAO create_and_bind_vao() {
-		GLuint id;
-		glGenVertexArrays(1, &id);
-		VAO out { id };
-		out.bind();
-		return out;
-	}
-
-	u32 safe_div(u32 a, u32 b) {
-		assert(a % b == 0);
-		return a / b;
-	}
-
-	Shaders init_shaders(const std::string& name) {
-		Shaders shaders = compile_shaders(name);
-
-		GLuint pos_attrib = to_gluint(glGetAttribLocation(shaders.program.id, "position"));
-		assert(pos_attrib == 0);
-		glEnableVertexAttribArray(pos_attrib);
-		glVertexAttribPointer(pos_attrib, safe_div(sizeof(glm::vec3), sizeof(float)), /*type*/ GL_FLOAT, /*normalized*/ GL_FALSE, /*stride*/ sizeof(VertexAttributes), reinterpret_cast<void*>(offsetof(VertexAttributes, pos)));
-
-		GLuint col_attrib = to_gluint(glGetAttribLocation(shaders.program.id, "color"));
-		assert(col_attrib == 1);
-		glEnableVertexAttribArray(col_attrib);
-		glVertexAttribPointer(col_attrib, safe_div(sizeof(glm::vec3), sizeof(float)), /*type*/ GL_FLOAT, /*normalized*/ GL_FALSE, /*stride*/ sizeof(VertexAttributes), reinterpret_cast<void*>(offsetof(VertexAttributes, color)));
-
-		/*GLuint texCoord_attrib = to_gluint(glGetAttribLocation(shaders.program.id, "texCoord"));
-		assert(texCoord_attrib == 2);
-		glEnableVertexAttribArray(texCoord_attrib);
-		glVertexAttribPointer(texCoord_attrib, safe_div(sizeof(glm::vec2), sizeof(float)), / *type* / GL_FLOAT, / *normalized* / GL_FALSE, / *stride* / sizeof(VertexAttributes), reinterpret_cast<void*>(offsetof(Attributes, texture_coords)));*/
-
-		return shaders;
-	}
-
-	void free_shaders(Shaders& shaders) {
-		glDeleteProgram(shaders.program.id);
-		glDeleteShader(shaders.vertex);
-		glDeleteShader(shaders.fragment);
-		glDisableVertexAttribArray(0);
-	}
-
-	Uniform get_uniform(const Shaders& shaders, const char* name) {
-		GLint id = glGetUniformLocation(shaders.program.id, name);
-		assert(id != -1); // NOTE: if this fails, perhaps the uniform was unused
-		return Uniform { id };
-	}
-
-
-	struct VAOInfo {
-		const VAO& vao;
-		const VBO& vbo;
-		const Shaders& shaders;
-		const Uniforms& uniforms;
-	};
-
-	void render(const VAOInfo& vao_info_tris, const VAOInfo& vao_info_dots, float time) {
-		//glUniform3f(uniforms.uniColor.id, time - flo(time), 0.0f, 0.0f);
-		glm::mat4 trans = total_matrix(time);
-
-
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-		glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
-
-		// In the tri pass: set stencil buffer to "42" wherever we draw a pixel.
-		int object_id = 42; // TODO
-		glStencilOp(/*stencil fail*/ GL_REPLACE, /*stencil pass, depth fail*/ GL_REPLACE, /*stencil pass, depth pass*/ GL_REPLACE);
-		glStencilFunc(GL_ALWAYS, object_id, 0xff);
-
-		//tris
-		vao_info_tris.vao.bind();
-		vao_info_tris.shaders.use();
-		glUniformMatrix4fv(vao_info_tris.uniforms.transform_tri.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(trans));
-		vao_info_tris.vbo.bind();
-		glDrawArrays(GL_TRIANGLES, 0, u32_to_glsizei(vao_info_tris.vbo.n_vertices));
-
-		glClear(GL_DEPTH_BUFFER_BIT);
-
-		// In the dot pass: We should only draw if the stencil buffer was drawn to.
-		// Not sure why another glStencilOp call is necessary...
-		glStencilOp(/*stencil fail*/ GL_ZERO, /*stencil pass, depth fail*/ GL_ZERO, /*stencil pass, depth pass*/ GL_ZERO);
-		glStencilFunc(GL_EQUAL, object_id, 0xff);
-
-		//TODO:DOTS
-		vao_info_dots.vao.bind();
-		vao_info_dots.shaders.use();
-		glUniformMatrix4fv(vao_info_dots.uniforms.transform_tri.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(trans));
-		vao_info_dots.vbo.bind();
-		glDrawArrays(GL_POINTS, 0, u32_to_glsizei(vao_info_dots.vbo.n_vertices));
-		//vbo_dots.bind();
-		//glDrawArrays(GL_POINTS, 0, u32_to_glsizei(vbo_dots.n_vertices));
 	}
 
 	void play_game(const Model& model) {
@@ -333,7 +81,6 @@ namespace {
 		//load_texture();
 		//glUniform1i(get_uniform(shaders, "tex").id, 0);
 
-
 		float time = 0;
 		while (!glfwWindowShouldClose(window)) {
 			time += 0.01;
@@ -351,14 +98,343 @@ namespace {
 		glfwDestroyWindow(window);
 		glfwTerminate();
 	}
+
+	__attribute__((unused))
+	void game() {
+		std::string cwd = get_current_directory();
+		std::string mtl_source = read_file(cwd + "/models/cube2.mtl");
+		std::string obj_source = read_file(cwd + "/models/cube2.obj");
+		Model m = parse_model(mtl_source.c_str(), obj_source.c_str());
+		//gen_strokes(m);
+
+		play_game(m);
+	}
 }
 
-int main() {
-	std::string cwd = get_current_directory();
-	std::string mtl_source = read_file(cwd + "/models/cube2.mtl");
-	std::string obj_source = read_file(cwd + "/models/cube2.obj");
-	Model m = parse_model(mtl_source.c_str(), obj_source.c_str());
-	//gen_strokes(m);
 
-	play_game(m);
+namespace {
+	void handle_soundio_err(int err) {
+		if (err) {
+			std::cerr << soundio_strerror(err) << std::endl;
+			assert(false);
+		}
+	}
+
+	template <typename T>
+	T* assert_not_null(T* ptr) {
+		assert(ptr != nullptr);
+		return ptr;
+	}
+
+	//Thread locals to the audio thread.
+	struct AudioThreadData {
+		float seconds_offset = 0.0f;
+		Slice<float> playing; // may be empty
+		u32 playing_index;
+	};
+
+	AudioThreadData& thread_local_audio_thread_data() {
+		static AudioThreadData a;
+		return a;
+	}
+}
+
+// NOTE: This runs in its own thread.
+// AudioThreadData will be read by that thread and written by class Audio.
+// Ignore frame_count_min, we should always write as much as possible.
+static void write_callback(struct SoundIoOutStream *outstream, int frame_count_min __attribute__((unused)), int frame_count_max) {
+	const struct SoundIoChannelLayout *layout = &outstream->layout;
+	//float float_sample_rate = outstream->sample_rate;
+	//float seconds_per_frame = 1.0f / float_sample_rate;
+	struct SoundIoChannelArea *areas;
+
+	int frames_left = frame_count_max;
+
+	AudioThreadData& data = thread_local_audio_thread_data();
+
+	//std::cout << "write_callback: " << std::this_thread::get_id() << std::endl;
+
+	while (frames_left > 0) {
+		int frame_count = frames_left;
+		handle_soundio_err(soundio_outstream_begin_write(outstream, &areas, &frame_count));
+		if (!frame_count)
+			break;
+
+		/*
+		float pitch = 440.0f;
+		float radians_per_second = pitch * 2.0f * 3.1415926535f;
+		for (int frame = 0; frame < frame_count; frame += 1) {
+			float volume = static_cast<float>(0.05);
+			float sample = float_sin((data.seconds_offset + frame * seconds_per_frame) * radians_per_second) * volume;
+			for (int channel = 0; channel < layout->channel_count; channel += 1) {
+				float* ptr = reinterpret_cast<float*>(areas[channel].ptr + areas[channel].step * frame);
+				*ptr = sample;
+			}
+		}
+		data.seconds_offset = static_cast<float>(fmod(static_cast<double>(data.seconds_offset + seconds_per_frame * frame_count), 1.0));
+		*/
+		for (int frame = 0; frame < frame_count; ++frame) {
+			for (int channel = 0; channel < layout->channel_count; channel += 1) {
+				float sample;
+				if (data.playing.is_empty()) {
+					sample = 0;
+				} else {
+					// Samples for each channel come one after another.
+					sample = data.playing[data.playing_index];
+					++data.playing_index;
+					if (data.playing_index == data.playing.size())
+						data.playing_index = 0;
+
+				}
+
+
+				float* ptr = reinterpret_cast<float*>(areas[channel].ptr + areas[channel].step * frame);
+				*ptr = sample;
+			}
+		}
+
+		handle_soundio_err(soundio_outstream_end_write(outstream));
+		frames_left -= frame_count;
+	}
+}
+
+struct PlayCommand {
+	Slice<float> to_play;
+};
+
+class SoundCommand {
+public:
+	enum class Kind { Nil, Play, Stop };
+
+private:
+	union Data {
+		PlayCommand play;
+
+		Data() {}
+		~Data() {}
+	};
+	Kind _kind;
+	Data _data;
+
+public:
+	inline Kind kind() { return _kind; }
+
+	inline SoundCommand() : _kind{Kind::Nil} {}
+	SoundCommand(const SoundCommand& other) { *this = other; }
+	void operator=(const SoundCommand& other) {
+		_kind = other._kind;
+		switch (other._kind) {
+			case Kind::Nil:
+			case Kind::Stop:
+				break;
+			case Kind::Play:
+				_data.play = other._data.play; break;
+		}
+
+	}
+	inline explicit SoundCommand(PlayCommand play) : _kind{Kind::Play} { _data.play = play; }
+	inline explicit SoundCommand(Kind kind) : _kind{kind} { assert(_kind == Kind::Stop); }
+
+	inline const PlayCommand& play() { assert(_kind == Kind::Play); return _data.play; }
+};
+
+namespace {
+	class Audio {
+		SoundIo* soundio;
+		SoundIoDevice* device;
+		SoundIoOutStream* outstream;
+
+	public:
+		void start() {
+			soundio = assert_not_null(soundio_create());
+
+			handle_soundio_err(soundio_connect(soundio));
+
+			soundio_flush_events(soundio);
+
+			int default_out_device_index = soundio_default_output_device_index(soundio);
+			assert(default_out_device_index >= 0);
+
+			device = assert_not_null(soundio_get_output_device(soundio, default_out_device_index));
+			// std::cout << "Output device: " << device->name << std::endl;
+
+			outstream = assert_not_null(soundio_outstream_create(device));
+			outstream->format = SoundIoFormatFloat32NE;
+			//TODO: does this launch a thread???
+			outstream->write_callback = write_callback;
+
+			handle_soundio_err(soundio_outstream_open(outstream));
+			handle_soundio_err(outstream->layout_error);
+			handle_soundio_err(soundio_outstream_start(outstream));
+		}
+
+		void play(Slice<float> to_play) {
+			AudioThreadData& data = thread_local_audio_thread_data();
+			data.playing = to_play;
+			data.playing_index = 0;
+		}
+
+		void stop() {
+			soundio_outstream_destroy(outstream);
+			soundio_device_unref(device);
+			soundio_destroy(soundio);
+		}
+	};
+
+	/*void audio_thread(moodycamel::ReaderWriterQueue<SoundCommand>* read_queue) {
+
+		/ *std::cout << "audio_thread: " << std::this_thread::get_id() << std::endl;
+
+		for (;;) {
+			SoundCommand command;
+			bool dequeued = read_queue->try_dequeue(command); // writes to command
+			assert(dequeued == (command.kind() != SoundCommand::Kind::Nil));
+			switch (command.kind()) {
+				case SoundCommand::Kind::Nil:
+					std::this_thread::sleep_for(std::chrono::milliseconds{10});
+					break;
+			}
+		}* /
+	}*/
+
+	struct DecodedFile {
+		// Note: this should be 2 channels stored together, L R L R L R L R.
+		DynArray<float> floats;
+	};
+
+	DecodedFile read_wav() {
+		SF_INFO sf_info;
+		// See http://www.mega-nerd.com/libsndfile/api.html#open
+		// The format field should be set to zero for some reason. Other than that, info is written to by `sf_open`, not read by it.
+		sf_info.format = 0;
+		SNDFILE* f = sf_open("/home/andy/CLionProjects/myproject/audio/awe.wav", SFM_READ, &sf_info);
+		assert(f); //else file did not exist
+		assert(sf_info.channels == 2);
+
+		DecodedFile res { { i64_to_u32(sf_info.frames * sf_info.channels) } };
+
+		sf_count_t n_read = sf_read_float(f, &res.floats[0], res.floats.size());
+		assert(n_read == res.floats.size());
+
+		sf_close(f);
+
+		return res;
+	}
+
+	DecodedFile read_vorbis(const char* file_name) {
+		OggVorbis_File vf;
+		FILE* file = fopen(file_name, "r");
+		if (file == nullptr) {
+			perror("error opening file");
+			assert(false);
+		}
+		int err = ov_open(file, &vf, nullptr, 0);
+		assert(err == 0);
+
+		// coments
+		{
+			char** ptr = ov_comment(&vf, -1)->user_comments;
+			vorbis_info* vi = ov_info(&vf, -1);
+			while (*ptr) {
+				fprintf(stderr,"%s\n",*ptr);
+				++ptr;
+			}
+			fprintf(stderr,"\nBitstream is %d channel, %ldHz\n",vi->channels,vi->rate);
+			fprintf(stderr,"\nDecoded length: %ld samples\n", ov_pcm_total(&vf,-1));
+			fprintf(stderr,"Encoded by: %s\n\n",ov_comment(&vf,-1)->vendor);
+		}
+
+		//TODO: get length ahead of time?
+		std::vector<float> res;
+		res.reserve(10000);
+
+		for (;;) {
+			const uint N_shorts = 4096;
+			i16 buf[N_shorts];
+			static_assert(sizeof(i16) == sizeof(char) * 2);
+			uint word_size = sizeof(i16) / sizeof(char);
+			uint N_chars = N_shorts * word_size;
+			int current_section;
+			long ret = ov_read(
+				&vf,
+				reinterpret_cast<char*>(buf),
+				uint_to_int(N_shorts * word_size),
+				/*bigendian*/ false,
+				uint_to_int(word_size),
+				/*signed*/ true,
+				&current_section);
+			if (ret == 0) {
+				/* EOF */
+				break;
+			} else if (ret < 0) {
+				// error in the stream
+				assert(false);
+			} else {
+				if (current_section != 0) {
+					// we don't bother dealing with sample rate changes, etc, but you'll have to
+					todo();
+				}
+
+				// Note: "ov_read() will decode at most one vorbis packet per invocation, so the value returned will generally be less than length."
+				uint n_chars_read = long_to_uint(ret);
+				uint n_shorts_read = safe_div(n_chars_read, word_size);
+				assert(n_chars_read < N_chars);
+
+				const float AMPLITUDE = std::numeric_limits<i16>::max();
+				for (uint i = 0; i != n_shorts_read; ++i) {
+					float f = static_cast<float>(buf[i]) / AMPLITUDE;
+					res.push_back(f);
+				}
+			}
+		}
+
+		ov_clear(&vf);
+
+		return { vec_to_dyn_array(res) };
+	}
+
+	template <typename Cb>
+	auto foo(const char* desc, Cb cb) {
+		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
+		auto res = cb();
+		std::chrono::high_resolution_clock::time_point end = std::chrono::high_resolution_clock::now();
+
+		std::cout << desc << " took " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" << std::endl;
+		return res;
+	}
+}
+
+//TODO: now play the wav data into soundio...
+
+int main() {
+	DecodedFile wavvy = foo("wav", []() { return read_wav(); });
+	DecodedFile vorby = foo("ogg", []() { return read_vorbis("/home/andy/CLionProjects/myproject/audio/awe.ogg"); });
+
+	bool prefer_wav = false;
+
+	Audio audio;
+	audio.start();
+	audio.play(prefer_wav ? wavvy.floats.slice() : vorby.floats.slice());
+	std::this_thread::sleep_for(std::chrono::seconds{10});
+	audio.stop();
+
+
+
+	/*
+	OLD:
+
+	moodycamel::ReaderWriterQueue<SoundCommand> q;
+	std::thread aud { audio_thread, &q };
+
+	q.emplace(SoundCommand { PlayCommand { floats.slice() } });
+
+	std::cout << "sleep" << std::endl;
+
+	std::this_thread::sleep_for(std::chrono::seconds{10});
+
+	std::cout << "woke" << std::endl;
+
+	q.emplace(SoundCommand { SoundCommand::Kind::Stop });
+	aud.join();*/
+
 }

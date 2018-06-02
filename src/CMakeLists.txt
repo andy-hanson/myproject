@@ -18,6 +18,8 @@ find_package(GLEW REQUIRED)
 find_package(PNG REQUIRED)
 include_directories(${PNG_INCLUDE_DIR})
 
+find_package(Threads REQUIRED)
+
 #find_package(GLUT REQUIRED)
 
 #find_package(SDL2 REQUIRED)
@@ -37,5 +39,5 @@ add_executable(myproject
 	util/DynArray.h
 	util/read_png.cpp
 	util/io.h
-	util/io.cpp util/read_obj.h util/read_obj.cpp process_model.cpp process_model.h model.h)
-target_link_libraries(myproject glfw ${PNG_LIBRARY})
+	util/io.cpp util/read_obj.h util/read_obj.cpp process_model.cpp process_model.h model.h vendor/readerwriterqueue/atomicops.h vendor/readerwriterqueue/readerwriterqueue.h shaders.h shaders.cpp util/math.h util/float.h)
+target_link_libraries(myproject glfw soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})

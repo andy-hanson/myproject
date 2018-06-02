@@ -1,22 +1,54 @@
 #pragma once
 
 #include <new>
+#include <vector>
 #include "./int.h"
 
-//TODO:MOVE
 template <typename T>
 class Slice {
-	T* _begin;
+	const T* _begin;
 	u32 _size;
 
 public:
 	inline Slice() : _begin{nullptr}, _size{0} {}
-	inline Slice(T* begin, T* end) : _begin{begin}, _size{i64_to_u32(end - begin)} {}
-	Slice(const Slice& other) = delete; // Don't want to lose const-ness
+	inline Slice(const T* begin, u32 size) : _begin{begin}, _size{size} {}
+	inline Slice(const T* begin, const T* end) : _begin{begin}, _size{i64_to_u32(end - begin)} {}
 
 	inline u32 size() const {
 		return _size;
 	}
+
+	inline const T& operator[](u32 i) const {
+		assert(i < size());
+		return *(_begin + i);
+	}
+
+	using const_iterator = const T*;
+	inline const_iterator begin() const { return _begin; }
+	inline const_iterator end() const { return _begin + _size; }
+
+	inline bool is_empty() { return _size == 0; }
+};
+
+template <typename T>
+class MutableSlice {
+	T* _begin;
+	u32 _size;
+
+public:
+	inline MutableSlice() : _begin{nullptr}, _size{0} {}
+	inline MutableSlice(T* begin, T* end) : _begin{begin}, _size{i64_to_u32(end - begin)} {}
+
+	inline u32 size() const {
+		return _size;
+	}
+
+	using const_iterator = const T*;
+	inline const_iterator begin() const { return _begin; }
+	inline const_iterator end() const { return _begin + _size; }
+	using iterator = T*;
+	inline iterator begin() { return _begin; }
+	inline iterator end() { return _begin + _size; }
 
 	inline T& operator[](u32 i) {
 		assert(i < size());
@@ -27,18 +59,13 @@ public:
 		return *(_begin + i);
 	}
 
-	using const_iterator = const T*;
-	inline const_iterator begin() const { return _begin; }
-	inline const_iterator end() const { return _begin + _size; }
-	using iterator = T*;
-	inline iterator begin() { return _begin; }
-	inline iterator end() { return _begin + _size; }
+	inline operator Slice<T>() const { return Slice<T> { _begin, _size }; }
 };
 
 /** Basically just a Slice with a destructor. */
 template <typename T>
 class DynArray {
-	Slice<T> _slice;
+	MutableSlice<T> _slice;
 
 	DynArray(T* begin, u32 len) : _slice{begin, begin + len} {}
 
@@ -47,7 +74,10 @@ public:
 	DynArray(const DynArray& other __attribute__((unused))) : _slice{} {
 		assert(false); //should be optimized away!
 	}
-	DynArray(DynArray&& other) = default;
+	DynArray(DynArray&& other) {
+		_slice = other._slice;
+		other._slice = MutableSlice<T> {};
+	}
 	~DynArray() {
 		::operator delete(_slice.begin());
 	}
@@ -59,8 +89,7 @@ public:
 		return { begin, slice.size() };
 	}
 
-	Slice<T>& slice() { return _slice; }
-	const Slice<T>& slice() const { return _slice; }
+	MutableSlice<T> slice() { return _slice; }
 
 	//TODO: kill and make them cast to slice?
 	inline T& operator[](u32 i) {
@@ -86,3 +115,28 @@ struct map {
 		return out;
 	}
 };
+
+//TODO:MOVE
+template <typename T>
+inline Slice<T> vec_to_slice(std::vector<T>& v) {
+	T* begin = &v[0];
+	T* end = begin + v.size();
+	return { begin, end };
+}
+
+//TODO:MOVE
+template <typename T>
+u8 index_of(const Slice<T>& slice, const T& value) {
+	u8 size = uint_to_u8(slice.size());
+	for (u8 i = 0; i != size; ++i) {
+		if (slice[i] == value)
+			return i;
+	}
+	assert(false);
+}
+
+//TODO:MOVE
+template <typename T>
+inline DynArray<T> vec_to_dyn_array(std::vector<T>& v) {
+	return DynArray<T>::copy_slice(vec_to_slice(v));
+}
