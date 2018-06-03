@@ -122,8 +122,8 @@ namespace {
 	};
 	struct DotUniforms {
 		Uniform u_model;
-		Uniform u_view_model;
 		Uniform u_transform;
+		Uniform u_materials;
 		Uniform u_depth_texture;
 	};
 
@@ -186,8 +186,8 @@ namespace {
 		check(shader_program.id != 0);
 
 		std::string cwd = get_current_directory();
-		std::string vs = read_file(cwd + "/shaders/" + name + ".vs");
-		std::string fs = read_file(cwd + "/shaders/" + name + ".fs");
+		std::string vs = read_file(cwd + "/shaders/" + name + ".vert");
+		std::string fs = read_file(cwd + "/shaders/" + name + ".frag");
 
 		GLuint vertex_shader_id = add_shader(shader_program, vs, GL_VERTEX_SHADER);
 		GLuint fragment_shader_id = add_shader(shader_program, fs, GL_FRAGMENT_SHADER);
@@ -246,14 +246,23 @@ namespace {
 		glm::mat4 viewModel; // excludes proj
 		glm::mat4 total;
 	};
-	Matrices get_matrices(float time) {
-		glm::mat4 model = glm::rotate(glm::mat4{}, time * glm::radians(10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	Matrices get_matrices(float time __attribute__((unused))) {
+		glm::mat4 model = glm::mat4{};//glm::rotate(glm::mat4{}, time * glm::radians(10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 		glm::mat4 view = glm::lookAt(
-			/*eye*/ glm::vec3(4.0f, 4.0f, 4.0f),
+			// Z axis points towards me
+			/*eye*/ glm::vec3(0.0f, 0.0f, 4.0f),
 			/*center*/ glm::vec3(0.0f, 0.0f, 0.0f),
-			/*up*/ glm::vec3(0.0f, 0.0f, 1.0f)
+			/*up*/ glm::vec3(0.0f, 1.0f, 0.0f)
 		);
-		glm::mat4 proj = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 1.0f, 10.0f);
+		glm::mat4 proj = glm::perspective(glm::radians(45.0f), static_cast<float>(VIEWPORT_WIDTH) / VIEWPORT_HEIGHT, 1.0f, 10.0f);
+		if ((false))
+			proj = glm::ortho<float>(
+				/*left*/ 0,
+				/*right*/ VIEWPORT_WIDTH,
+				/*bottom*/ 0,
+				/*top*/ VIEWPORT_HEIGHT,
+				/*zNear*/ -2.0f,
+				/*zFar*/ 2.0f);
 
 		glm::mat4 viewModel = view * model;
 		glm::mat4 total =  proj * viewModel;
@@ -392,13 +401,10 @@ namespace {
 			case ShadersKind::Dot: {
 				vec3_attr("a_position", 0, offsetof(VertexAttributesDot, a_position));
 				vec3_attr("a_normal", 1, offsetof(VertexAttributesDot, a_normal));
-				vec3_attr("a_color", 2, offsetof(VertexAttributesDot, a_color));
-				int_attr("a_material_id", 3, offsetof(VertexAttributesDot, a_material_id));
+				int_attr("a_material_id", 2, offsetof(VertexAttributesDot, a_material_id));
 				break;
 			}
 		}
-
-
 
 		/*GLuint texCoord_attrib = to_gluint(glGetAttribLocation(shaders.program.id, "texCoord"));
 		check(texCoord_attrib == 2);
@@ -481,6 +487,17 @@ struct GraphicsImpl {
 			}
 		});
 
+		constexpr uint MAX_MATERIALS = 5u;
+		Material materials[MAX_MATERIALS] = {
+			// Note: first object id is 1, so this is offset.
+			// r g b r g b
+			{ glm::vec3(1.0, 1.0, 0.0), glm::vec3(1.0, 1.0, 1.0) },
+			{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 1.0) },
+			{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) },
+			{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) },
+			{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) },
+		};
+
 		if ((true)) {
 			enabling(GL_VERTEX_PROGRAM_POINT_SIZE, [&]() {
 				// Now render to screen.
@@ -491,17 +508,11 @@ struct GraphicsImpl {
 				glClear(static_cast<uint>(GL_COLOR_BUFFER_BIT));
 				glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
 
-				// In the dot pass: We should only draw if the stencil buffer was drawn to.
-				// Not sure why another glStencilOp call is necessary...
-				//glStencilOp(/*stencil fail*/ GL_ZERO, /*stencil pass, depth fail*/ GL_ZERO, /*stencil pass, depth pass*/ GL_ZERO);
-				//glStencilFunc(GL_EQUAL, object_id, 0xff);
-
-				//TODO:DOTS
 				vao_info_dots.vao.bind();
 				vao_info_dots.shaders.use();
 				glUniformMatrix4fv(vao_info_dots.uniforms.u_model.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.model));
-				glUniformMatrix4fv(vao_info_dots.uniforms.u_view_model.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.viewModel));
 				glUniformMatrix4fv(vao_info_dots.uniforms.u_transform.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.total));
+				glUniform1fv(vao_info_dots.uniforms.u_materials.id, MAX_MATERIALS * sizeof(Material) / sizeof(float), reinterpret_cast<float*>(materials));
 
 				//TODO: check for error after trying to set uniform?
 				//TODO: Yes this is tricky. Have to bind a texture and set the uniform to the texture *unit*, not the texture id.
@@ -510,8 +521,6 @@ struct GraphicsImpl {
 
 				vao_info_dots.vbo.bind();
 				glDrawArrays(GL_POINTS, 0, u32_to_glsizei(vao_info_dots.vbo.n_vertices));
-				//vbo_dots.bind();
-				//glDrawArrays(GL_POINTS, 0, u32_to_glsizei(vbo_dots.n_vertices));
 			});
 		}
 
@@ -581,7 +590,7 @@ Graphics Graphics::start(const RenderableModel& renderable_model) {
 	VAO vao_dots = create_and_bind_vao();
 	VBO vbo_dots = create_and_bind_vertex_buffer(renderable_model.dots);
 	Shaders shaders_dot = init_shaders("dot", ShadersKind::Dot);
-	DotUniforms uniforms_dot { get_uniform(shaders_dot, "u_model"), get_uniform(shaders_dot, "u_view_model"), get_uniform(shaders_dot, "u_transform"), get_uniform(shaders_dot, "u_depth_texture") };
+	DotUniforms uniforms_dot { get_uniform(shaders_dot, "u_model"), get_uniform(shaders_dot, "u_transform"), get_uniform(shaders_dot, "u_materials"), get_uniform(shaders_dot, "u_depth_texture") };
 	VAOInfo<DotUniforms> vao_info_dots { vao_dots, vbo_dots, shaders_dot, uniforms_dot };
 
 	Texture loaded_texture = load_texture().first;

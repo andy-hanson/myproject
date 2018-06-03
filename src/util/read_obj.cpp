@@ -92,7 +92,7 @@ namespace {
 		skip_line(s);
 	}
 
-	void parse_materials(const std::string& file_content, std::vector<std::string>& material_names, std::vector<Material>& materials) {
+	void parse_materials(const std::string& file_content, std::vector<std::string>& material_names, std::vector<ParsedMaterial>& materials) {
 		std::istringstream s { file_content };
 		skip_comments(s);
 
@@ -125,14 +125,14 @@ namespace {
 			material_names.push_back(name);
 			// First id is 1
 			uint id = u64_to_u32(materials.size() + 1);
-			materials.push_back(Material { id, ns, ka, kd, ks, ke, ni, d, illum });
+			materials.push_back(ParsedMaterial { id, ns, ka, kd, ks, ke, ni, d, illum });
 		}
 	}
 }
 
 Model parse_model(const char* mtl_source, const char* obj_source) {
 	std::vector<std::string> material_names;
-	std::vector<Material> materials;
+	std::vector<ParsedMaterial> materials;
 	parse_materials(mtl_source, material_names, materials);
 
 	std::istringstream s { obj_source };

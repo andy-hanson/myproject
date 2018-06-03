@@ -23,11 +23,11 @@ namespace {
 	};
 
 	Triangle face_vertices(const Face& face, const Model& m) {
-		return { m.vertices[face.vertex_0], m.vertices[face.vertex_1], m.vertices[face.vertex_2] };
+		return Triangle { m.vertices[face.vertex_0], m.vertices[face.vertex_1], m.vertices[face.vertex_2] };
 	};
 
 	Normals face_normals(const Face& face, const Model& m) {
-		return { m.normals[face.normal_0], m.normals[face.normal_1], m.normals[face.normal_2] };
+		return Normals { m.normals[face.normal_0], m.normals[face.normal_1], m.normals[face.normal_2] };
 	}
 
 	double triangle_area(const Triangle& t) {
@@ -54,6 +54,10 @@ namespace {
 
 	using Random = std::mt19937_64;
 
+	bool about_equal(float a, float b) {
+		return (a - 0.01f) < b && (a + 0.01f) > b;
+	}
+
 	struct PointNormal { glm::vec3 point; glm::vec3 normal; };
 	// Uses barycentric coordinates
 	PointNormal random_point_normal_in_triangle(const Triangle& tri, const Normals& normals, Random& rand) {
@@ -63,6 +67,8 @@ namespace {
 		float alpha = 1 - float_sqrt(rand0);
 		float beta = rand1 * (1 - alpha);
 		float gamma = 1 - alpha - beta;
+
+		check(about_equal(alpha + beta + gamma, 1.0f));
 
 		glm::vec3 point = tri.p0 * alpha + tri.p1 * beta + tri.p2 * gamma;
 		glm::vec3 normal = normals.n0 * alpha + normals.n1 * beta + normals.n2 * gamma;
@@ -78,6 +84,7 @@ namespace {
 	float min(float a, float b) { return a < b ? a : b; }
 
 	//TODO: use hsv
+	__attribute__((unused))
 	Color random_color_near(Color c, Random& rand) {
 		auto fluctuate = [&](float f) { return rand_range(max(f - 0.1f, 0), min(f + 0.1f, 1.0), rand); };
 		return Color { fluctuate(c.r), fluctuate(c.g), fluctuate(c.b) };
@@ -99,7 +106,7 @@ namespace {
 			Triangle tri = face_vertices(face, m);
 			//TODO: interpolate between vertex normals -- needs adjacent faces
 			Normals normals = face_normals(face, m);
-			const Material& material = m.materials[face.material];
+			const ParsedMaterial& material = m.materials[face.material];
 
 			double area = triangle_area(tri);
 
@@ -109,7 +116,8 @@ namespace {
 
 			for (uint i = n_face_points; i != 0; --i) {
 				PointNormal pn = random_point_normal_in_triangle(tri, normals, rand);
-				out[out_i++] = VertexAttributesDot { pn.point, pn.normal, random_color_near(material.kd, rand).vec3(), material.id };
+				//Color color = material.kd;//random_color_near(material.kd, rand);
+				out[out_i++] = VertexAttributesDot { pn.point, pn.normal, material.id };
 			}
 		}
 
@@ -122,7 +130,7 @@ namespace {
 		uint i = 0;
 		for (const Face& face : m.faces) {
 			Triangle tri = face_vertices(face, m);
-			const Material& material = m.materials[face.material];
+			const ParsedMaterial& material = m.materials[face.material];
 			out[i++] = VertexAttributesTri { tri.p0, material.id };
 			out[i++] = VertexAttributesTri { tri.p1, material.id };
 			out[i++] = VertexAttributesTri { tri.p2, material.id };

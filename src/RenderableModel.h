@@ -4,6 +4,12 @@
 
 #include "./util/DynArray.h"
 
+// Must be kept in sync with `dot.vert`.
+struct Material {
+	glm::vec3 diffuse;
+	glm::vec3 specular;
+} __attribute__((packed));
+
 struct VertexAttributesTri {
 	glm::vec3 a_position;
 	u32 a_material_id;
@@ -12,7 +18,6 @@ struct VertexAttributesTri {
 struct VertexAttributesDot {
 	glm::vec3 a_position;
 	glm::vec3 a_normal;
-	glm::vec3 a_color;
 	u32 a_material_id;
 } __attribute__((packed));
 
