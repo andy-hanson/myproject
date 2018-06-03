@@ -4,17 +4,19 @@
 
 #include "./util/DynArray.h"
 
-// Note: every member must be a float, since we pass this to glVertexAttribPointer.
-// TODO: we'll probably want separate attributes for flat vs dots rendering
-//If changing this, must also change the call to `glVertexAttribPointer`
-struct VertexAttributes {
-	glm::vec3 pos;
-	glm::vec3 color;
-	//glm::vec2 texture_coords;
+struct VertexAttributesTri {
+	glm::vec3 a_position;
+	u32 a_material_id;
 } __attribute__((packed));
 
+struct VertexAttributesDot {
+	glm::vec3 a_position;
+	glm::vec3 a_normal;
+	glm::vec3 a_color;
+	u32 a_material_id;
+} __attribute__((packed));
 
 struct RenderableModel {
-	DynArray<VertexAttributes> tris;
-	DynArray<VertexAttributes> dots;
+	DynArray<VertexAttributesTri> tris;
+	DynArray<VertexAttributesDot> dots;
 };

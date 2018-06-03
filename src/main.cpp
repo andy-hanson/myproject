@@ -2,7 +2,6 @@
 #include <iostream> // std::cerr
 #include <string>
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
 #include <limits>
 
 #include <glm/vec2.hpp>
@@ -35,31 +34,16 @@
 
 namespace {
 
-	GLFWwindow* init_glfw() {
-		glfwInit();
-		GLFWwindow* window = glfwCreateWindow(800, 600, "OpenGL", nullptr, nullptr);
-		assert(window != nullptr);
-		glfwMakeContextCurrent(window);
-		return window;
-	}
-
 	void play_game(const Model& model) {
 		RenderableModel renderable_model = convert_model(model);
-
-		GLFWwindow* window = init_glfw();
 
 		Graphics graphics = Graphics::start(renderable_model);
 
 		float time = 0;
-		while (!glfwWindowShouldClose(window)) {
+		while (!graphics.window_should_close()) {
 			time += 0.01;
 			graphics.render(time);
-			glfwSwapBuffers(window);
-			glfwPollEvents();
 		}
-
-		glfwDestroyWindow(window);
-		glfwTerminate();
 	}
 
 	void game() {

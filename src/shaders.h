@@ -11,6 +11,7 @@ class Graphics {
 	inline Graphics(GraphicsImpl* impl) : _impl{impl} {}
 public:
 	static Graphics start(const RenderableModel& renderable_model);
+	bool window_should_close();
 	void render(float time);
 	~Graphics();
 };

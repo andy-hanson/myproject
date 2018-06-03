@@ -83,17 +83,17 @@ namespace {
 		return Color { fluctuate(c.r), fluctuate(c.g), fluctuate(c.b) };
 	}
 
-	DynArray<VertexAttributes> gen_strokes(const Model& m, Random& rand) {
+	DynArray<VertexAttributesDot> gen_dots(const Model& m, Random& rand) {
 		double total_area = compute_total_area(m);
 
-		u32 n_strokes = m.vertices.size() * 3; // TODO: this is arbitrary...
+		u32 n_strokes = 500; // TODO: configurable
 
 		double density = n_strokes / total_area;
 
 		double vertices_owed = 0;
 
 		uint out_i = 0;
-		DynArray<VertexAttributes> out { n_strokes };
+		DynArray<VertexAttributesDot> out { n_strokes };
 
 		for (const Face& face : m.faces) {
 			Triangle tri = face_vertices(face, m);
@@ -109,8 +109,7 @@ namespace {
 
 			for (uint i = n_face_points; i != 0; --i) {
 				PointNormal pn = random_point_normal_in_triangle(tri, normals, rand);
-				//todo: normal should be in attributes
-				out[out_i++] = VertexAttributes { pn.point, random_color_near(material.kd, rand).vec3() };
+				out[out_i++] = VertexAttributesDot { pn.point, pn.normal, random_color_near(material.kd, rand).vec3(), material.id };
 			}
 		}
 
@@ -118,20 +117,15 @@ namespace {
 		return out;
 	}
 
-	DynArray<VertexAttributes> get_triangles(const Model& m) {
-		DynArray<VertexAttributes> out { m.faces.size() * 3 };
+	DynArray<VertexAttributesTri> get_triangles(const Model& m) {
+		DynArray<VertexAttributesTri> out { m.faces.size() * 3 };
 		uint i = 0;
 		for (const Face& face : m.faces) {
 			Triangle tri = face_vertices(face, m);
-			//TODO: interpolate between vertex normals -- needs adjacent faces
-			//Normals normals = face_normals(face, m);
 			const Material& material = m.materials[face.material];
-			//TODO: use the other attributes!
-			Color color = material.kd;
-
-			out[i++] = { tri.p0, color.vec3() };
-			out[i++] = { tri.p1, color.vec3() };
-			out[i++] = { tri.p2, color.vec3() };
+			out[i++] = VertexAttributesTri { tri.p0, material.id };
+			out[i++] = VertexAttributesTri { tri.p1, material.id };
+			out[i++] = VertexAttributesTri { tri.p2, material.id };
 		}
 		assert(i == out.size());
 		return out;
@@ -140,5 +134,5 @@ namespace {
 
 RenderableModel convert_model(const Model& m) {
 	Random rand;
-	return { get_triangles(m), gen_strokes(m, rand) };
+	return { get_triangles(m), gen_dots(m, rand) };
 };

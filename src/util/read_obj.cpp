@@ -123,7 +123,9 @@ namespace {
 			u8 illum = read_u8(s);
 
 			material_names.push_back(name);
-			materials.push_back(Material { ns, ka, kd, ks, ke, ni, d, illum });
+			// First id is 1
+			uint id = u64_to_u32(materials.size() + 1);
+			materials.push_back(Material { id, ns, ka, kd, ks, ke, ni, d, illum });
 		}
 	}
 }

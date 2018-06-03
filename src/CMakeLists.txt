@@ -7,7 +7,7 @@ set(CMAKE_CXX_COMPILER "/home/andy/bin/clang+llvm-6.0.0-x86_64-linux-gnu-ubuntu-
 
 # -stdlib=libstdc++ supposedly improves debugging (https://blog.jetbrains.com/clion/2015/05/debug-clion/)
 # Without -D_GLIBCXX_DEBUG I can't inspect strings
-set(CMAKE_CXX_FLAGS "-pedantic -Weverything -Wno-c++98-compat-pedantic -Wno-padded -Werror -stdlib=libstdc++ -D_GLIBCXX_DEBUG")
+set(CMAKE_CXX_FLAGS "-pedantic -Weverything -Wno-c++98-compat-pedantic -Wno-padded -Wno-missing-noreturn -Werror -stdlib=libstdc++ -D_GLIBCXX_DEBUG")
 
 find_package(OpenGL 4.5 REQUIRED)
 

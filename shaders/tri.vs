@@ -1,19 +1,13 @@
 #version 300 es
 
-in vec3 position;
-in vec3 color;
-//in vec2 texCoord;
+in vec3 a_position;
+in uint a_material_id;
 
-out vec3 frag_color;
-//out vec2 frag_texCoord;
+flat out uint frag_material_id;
 
 uniform mat4 u_transform;
 
-// NOTE TO SELF: Can't use `varying` in opengl ES 3.0.
-// Use 'out' in the vertex shader and 'in' in the fragment shader.
-
 void main() {
-    gl_Position = u_transform * vec4(position, 1.0);
-    frag_color = color;
-    //frag_texCoord = texCoord;
+	gl_Position = u_transform * vec4(a_position, 1.0);
+	frag_material_id = a_material_id;
 }

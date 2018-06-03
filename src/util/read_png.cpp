@@ -6,6 +6,54 @@
 #include "./DynArray.h"
 #include "./int.h"
 
+namespace {
+	const uint DEPTH = 8;
+	const uint PIXEL_SIZE = 3;
+
+	struct pixel { u8 r; u8 g; u8 b; };
+
+	pixel pixel_at(Slice<u8> bitmap, uint width, uint height, uint x, uint y) {
+		check(x < width && y < height);
+		uint i = y * width + x;
+		check(i < width * height);
+		return pixel { bitmap[i * 3], bitmap[i * 3 + 1], bitmap[i * 3 + 2] };
+	}
+}
+
+void write_png(u32 width, u32 height, Slice<u8> bitmap, const char* file_name) {
+	png_structp png_ptr = assert_not_null(png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr));
+
+	png_infop info_ptr = assert_not_null(png_create_info_struct(png_ptr));
+
+	png_set_IHDR(png_ptr, info_ptr, width, height, DEPTH, PNG_COLOR_TYPE_RGB, PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
+
+	//TODO: avoid malloc
+	png_byte** row_pointers = static_cast<png_byte**>(png_malloc(png_ptr, height * sizeof(png_byte*)));
+	for (uint y = 0; y != height; ++y) {
+		png_byte* row = static_cast<png_byte*>(png_malloc(png_ptr, sizeof(uint8_t) * width * PIXEL_SIZE));
+		row_pointers[y] = row;
+		//TODO: this whole loop is just memcpy?
+		for (uint x = 0; x != width; ++x) {
+			pixel pixel = pixel_at(bitmap, width, height, x, y);
+			*row++ = pixel.r;
+			*row++ = pixel.g;
+			*row++ = pixel.b;
+		}
+	}
+
+	FILE* fp = assert_not_null(fopen(file_name, "wb"));
+	png_init_io(png_ptr, fp);
+	png_set_rows(png_ptr, info_ptr, row_pointers);
+	png_write_png(png_ptr, info_ptr, PNG_TRANSFORM_IDENTITY, nullptr);
+
+	for (size_t y = 0; y != height; ++y) {
+		png_free(png_ptr, row_pointers[y]);
+	}
+	png_free(png_ptr, row_pointers);
+
+	png_destroy_write_struct(&png_ptr, &info_ptr);
+}
+
 Matrix<uint32_t> png_texture_load(const char* file_name) {
 	png_byte header[8];
 
