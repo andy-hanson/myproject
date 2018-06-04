@@ -3,16 +3,16 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include <glm/gtc/type_ptr.hpp> // glm::value_ptr
+#include <iostream> // std::cerr
 
-#include "./util/DynArray.h"
-#include "./util/int.h"
-#include "./util/io.h"
-#include "./util/Matrix.h"
-#include "./util/assert.h"
-#include "./util/read_png.h"
-#include "./util/math.h"
+#include "../util/DynArray.h"
+#include "../util/int.h"
+#include "../util/io.h"
+#include "../util/Matrix.h"
+#include "../util/assert.h"
+#include "../util/math.h"
 
-#include <iostream> // For printing errors
+#include "./read_png.h"
 
 namespace {
 	// Since we registered a callback, this shouldn't be necessary

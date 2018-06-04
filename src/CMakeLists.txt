@@ -20,24 +20,48 @@ include_directories(${PNG_INCLUDE_DIR})
 
 find_package(Threads REQUIRED)
 
-#find_package(GLUT REQUIRED)
-
-#find_package(SDL2 REQUIRED)
-#include_directories(${SDL2_INCLUDE_DIRS})
-
+#include_directories(/usr/include/ois)
+include_directories(/usr/include/libevdev-1.0/libevdev)
 include_directories(GLFW3_INCLUDE_DIRS)
 include_directories(GLEW_INCLUDE_DIRS)
 link_libraries(${GLEW_LIBRARIES})
 link_libraries(${OPENGL_LIBRARY})
-#link_libraries(${GLUT_LIBRARIES})
 
 add_executable(myproject
-	main.cpp
-	util/Matrix.h
-	util/read_png.h
-	util/int.h
-	util/DynArray.h
-	util/read_png.cpp
-	util/io.h
-	util/io.cpp util/read_obj.h util/read_obj.cpp process_model.cpp process_model.h model.h vendor/readerwriterqueue/atomicops.h vendor/readerwriterqueue/readerwriterqueue.h shaders.h shaders.cpp util/math.h util/float.h util/read_wav.h util/audio_file.h util/read_wav.cpp util/read_ogg.h util/read_ogg.cpp util/assert.h util/audio.h util/audio.cpp util/Slice.h RenderableModel.h)
-target_link_libraries(myproject glfw soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})
+	./main.cpp
+
+	./audio/audio.cpp
+	./audio/audio.h
+	./audio/audio_file.h
+	./audio/read_wav.h
+	./audio/read_wav.cpp
+	./audio/read_ogg.h
+	./audio/read_ogg.cpp
+
+	./control/Controller.h
+	./control/Controller.cpp
+
+	./graphics/model.h
+	./graphics/process_model.cpp
+	./graphics/process_model.h
+	./graphics/shaders.h
+	./graphics/shaders.cpp
+	./graphics/read_obj.h
+	./graphics/read_obj.cpp
+	./graphics/read_png.cpp
+	./graphics/read_png.h
+	./graphics/RenderableModel.h
+
+	./util/assert.h
+	./util/DynArray.h
+	./util/float.h
+	./util/int.h
+	./util/io.cpp
+	./util/io.h
+	./util/math.h
+	./util/Matrix.h
+	./util/Slice.h
+
+	./vendor/readerwriterqueue/atomicops.h
+	./vendor/readerwriterqueue/readerwriterqueue.h)
+target_link_libraries(myproject glfw evdev OIS soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})

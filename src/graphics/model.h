@@ -2,8 +2,8 @@
 
 #include <glm/vec3.hpp>
 
-#include "./util/DynArray.h"
-#include "./util/int.h"
+#include "../util/DynArray.h"
+#include "../util/int.h"
 
 //Note: texture and vertex indices were parsed away from 1-based. So this is 1 less than what's in the file.
 

@@ -3,8 +3,8 @@
 #define PNG_DEBUG 3 // TODO: #ifdef DEBUG
 #include <png.h>
 #include "./assert.h"
-#include "./DynArray.h"
-#include "./int.h"
+#include "../util/DynArray.h"
+#include "../util/int.h"
 
 namespace {
 	const uint DEPTH = 8;

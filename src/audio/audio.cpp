@@ -1,8 +1,9 @@
 #include "./audio.h"
 
 #include <soundio/soundio.h>
-#include "./assert.h"
-#include "./Slice.h"
+
+#include "../util/assert.h"
+#include "../util/Slice.h"
 
 namespace {
 

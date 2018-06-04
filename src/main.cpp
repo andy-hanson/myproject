@@ -1,36 +1,23 @@
-#include <cassert>
-#include <iostream> // std::cerr
-#include <string>
 #include <GL/glew.h>
-#include <limits>
-
-#include <glm/vec2.hpp>
-#include <glm/vec3.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <vector>
-#include <sstream>
+#include <iostream>
+#include <thread>
 
 #include "./util/io.h"
 #include "./util/float.h"
 #include "./util/Matrix.h"
-#include "./util/read_obj.h"
-#include "./model.h"
-#include "./process_model.h"
 
-
-#include <cassert>
-#include <cstdint>
-#include <iostream>
-#include <vector>
-#include <thread>
+#include "./graphics/process_model.h"
+#include "./graphics/model.h"
+#include "./graphics/read_obj.h"
+#include "./graphics/shaders.h"
 
 #include "./vendor/readerwriterqueue/readerwriterqueue.h"
-#include "./shaders.h"
 
-#include "./util/audio.h"
-#include "./util/audio_file.h"
-#include "./util/read_wav.h"
-#include "./util/read_ogg.h"
+#include "./audio/audio.h"
+#include "./audio/audio_file.h"
+#include "./audio/read_wav.h"
+#include "./audio/read_ogg.h"
+#include "./control/Controller.h"
 
 namespace {
 
@@ -57,29 +44,7 @@ namespace {
 	}
 }
 
-
 namespace {
-
-}
-
-
-namespace {
-	/*void audio_thread(moodycamel::ReaderWriterQueue<SoundCommand>* read_queue) {
-
-		/ *std::cout << "audio_thread: " << std::this_thread::get_id() << std::endl;
-
-		for (;;) {
-			SoundCommand command;
-			bool dequeued = read_queue->try_dequeue(command); // writes to command
-			assert(dequeued == (command.kind() != SoundCommand::Kind::Nil));
-			switch (command.kind()) {
-				case SoundCommand::Kind::Nil:
-					std::this_thread::sleep_for(std::chrono::milliseconds{10});
-					break;
-			}
-		}* /
-	}*/
-
 	template <typename Cb>
 	auto print_time(const char* desc, Cb cb) {
 		std::chrono::high_resolution_clock::time_point start = std::chrono::high_resolution_clock::now();
@@ -104,11 +69,21 @@ namespace {
 	}
 }
 
-//TODO: now play the wav data into soundio...
+namespace {
+
+	void test_input() {
+		Controller controller = Controller::start();
+		for (uint i = 0; i != 100; ++i) {
+			ControllerGet g = controller.get();
+			std::cout << g.button_is_down << std::endl;
+			std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		}
+	}
+}
+
 
 int main() {
 	if ((false)) test_sound();
-
-	game();
-
+	if ((false)) game();
+	if ((false)) test_input();
 }

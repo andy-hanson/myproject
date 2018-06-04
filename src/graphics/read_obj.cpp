@@ -1,8 +1,9 @@
+#include "./read_obj.h"
+
 #include <sstream>
 #include <vector>
 
-#include "./assert.h"
-#include "./read_obj.h"
+#include "../assert.h"
 
 namespace {
 

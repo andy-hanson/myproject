@@ -37,6 +37,10 @@ inline uint int_to_uint(int i) {
 	check(i >= 0);
 	return static_cast<uint>(i);
 }
+inline u8 int_to_u8(int i) {
+	check(i >= 0 && i < std::numeric_limits<u8>::max());
+	return static_cast<u8>(i);
+}
 inline unsigned long long_to_ulong(long l) {
 	check(l >= 0 && l <= std::numeric_limits<uint>::max());
 	return static_cast<uint>(l);
@@ -44,6 +48,11 @@ inline unsigned long long_to_ulong(long l) {
 inline int long_to_int(long l) {
 	check(l >= std::numeric_limits<int>::min() && l <= std::numeric_limits<int>::max());
 	return static_cast<int>(l);
+}
+
+inline u8 safe_incr_u8(u8 u) {
+	check(u != std::numeric_limits<u8>::max());
+	return u + 1;
 }
 
 inline u64 i64_to_u64(i64 i) {
@@ -58,6 +67,11 @@ inline int uint_to_int(uint u) {
 inline int ulong_to_int(unsigned long u) {
 	check(u <= std::numeric_limits<int>::max());
 	return static_cast<int>(u);
+}
+
+inline u8 char_to_u8(char c) {
+	check(c >= 0);
+	return static_cast<u8>(c);
 }
 
 inline u32 safe_div(u32 a, u32 b) {

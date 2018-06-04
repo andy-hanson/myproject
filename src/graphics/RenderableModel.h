@@ -2,7 +2,7 @@
 
 #include <glm/vec3.hpp>
 
-#include "./util/DynArray.h"
+#include "../util/DynArray.h"
 
 // Must be kept in sync with `dot.vert`.
 struct Material {

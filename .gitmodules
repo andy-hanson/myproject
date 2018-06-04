@@ -1,0 +1,3 @@
+[submodule "gainput"]
+	path = vendor/gainput
+	url = https://github.com/jkuhlmann/gainput
