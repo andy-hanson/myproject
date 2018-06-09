@@ -20,14 +20,17 @@ include_directories(${PNG_INCLUDE_DIR})
 
 find_package(Threads REQUIRED)
 
-#include_directories(/usr/include/ois)
 include_directories(/usr/include/libevdev-1.0/libevdev)
 include_directories(GLFW3_INCLUDE_DIRS)
 include_directories(GLEW_INCLUDE_DIRS)
 link_libraries(${GLEW_LIBRARIES})
 link_libraries(${OPENGL_LIBRARY})
 
+include_directories(../vendor/reactphysics3d/src)
+
 add_executable(myproject
+	./game.cpp
+	./game.h
 	./main.cpp
 
 	./audio/audio.cpp
@@ -41,16 +44,19 @@ add_executable(myproject
 	./control/Controller.h
 	./control/Controller.cpp
 
-	./graphics/model.h
-	./graphics/process_model.cpp
-	./graphics/process_model.h
-	./graphics/shaders.h
-	./graphics/shaders.cpp
-	./graphics/read_obj.h
-	./graphics/read_obj.cpp
+	graphics/convert_model.cpp
+	graphics/convert_model.h
+	./graphics/Graphics.h
+	./graphics/Graphics.cpp
 	./graphics/read_png.cpp
 	./graphics/read_png.h
 	./graphics/RenderableModel.h
+
+	./model/Color.h
+	./model/Model.h
+	./model/ModelKind.h
+	./model/parse_model.cpp
+	./model/parse_model.h
 
 	./util/assert.h
 	./util/DynArray.h
@@ -60,8 +66,10 @@ add_executable(myproject
 	./util/io.h
 	./util/math.h
 	./util/Matrix.h
+	./util/Ref.h
 	./util/Slice.h
 
 	./vendor/readerwriterqueue/atomicops.h
-	./vendor/readerwriterqueue/readerwriterqueue.h)
-target_link_libraries(myproject glfw evdev OIS soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})
+	./vendor/readerwriterqueue/readerwriterqueue.h
+	graphics/gl_types.h graphics/shader_utils.h graphics/shader_utils.cpp util/string.h)
+target_link_libraries(myproject glfw evdev OIS reactphysics3d soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})

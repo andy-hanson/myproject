@@ -71,8 +71,7 @@ struct ControllerImpl {
 						// think I can ignore these:
 						break;
 					case EV_KEY: {
-						check(ev.value == 0 || ev.value == 1);
-						bool pressed = ev.value == 1;
+						bool pressed = int_to_bool(ev.value);
 						switch (ev.code) {
 							case BTN_NORTH:
 							case BTN_WEST:

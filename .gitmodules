@@ -1,3 +1,6 @@
 [submodule "gainput"]
 	path = vendor/gainput
 	url = https://github.com/jkuhlmann/gainput
+[submodule "vendor/reactphysics3d"]
+	path = vendor/reactphysics3d
+	url = https://github.com/DanielChappuis/reactphysics3d.git

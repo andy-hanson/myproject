@@ -1,4 +1,4 @@
-#include "./read_obj.h"
+#include "parse_model.h"
 
 #include <sstream>
 #include <vector>

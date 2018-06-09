@@ -1,4 +1,4 @@
-#include "./process_model.h"
+#include "convert_model.h"
 
 #include <glm/vec3.hpp>
 #include <glm/gtc/matrix_transform.hpp> // cross
