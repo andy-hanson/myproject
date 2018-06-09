@@ -10,6 +10,7 @@
 #include "../util/Matrix.h"
 #include "../util/assert.h"
 #include "../util/math.h"
+#include "../util/Ref.h"
 
 #include "./convert_model.h"
 #include "./gl_types.h"
@@ -23,7 +24,6 @@ namespace {
 }
 
 namespace {
-
 	Texture bind_texture_from_image(const Matrix<u32>& mat) {
 		// Generate the OpenGL texture object
 		GLuint texture;
@@ -49,8 +49,9 @@ namespace {
 		glm::mat4 viewModel; // excludes proj
 		glm::mat4 total;
 	};
-	Matrices get_matrices() {
-		glm::mat4 model = glm::mat4{};//glm::rotate(glm::mat4{}, time * glm::radians(10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+	Matrices get_matrices(const DrawEntity& to_draw) {
+		glm::mat4 model = glm::translate(glm::toMat4(to_draw.transform.quat), to_draw.transform.position); //glm::rotate(glm::mat4{}, time * glm::radians(10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
+
 		glm::mat4 view = glm::lookAt(
 			// Z axis points towards me
 			/*eye*/ glm::vec3(0.0f, 0.0f, 4.0f),
@@ -180,7 +181,7 @@ namespace {
 	}
 
 	void save_image(const Texture& texture, uint width, uint height, const char* file_name) {
-		DynArray<u8> image_data { width * height * 3 }; // * 10 to make sure error isn't due to size
+		DynArray<u8> image_data = DynArray<u8>::uninitialized(width * height * 3); // * 10 to make sure error isn't due to size
 		glBindTexture(GL_TEXTURE_2D, texture.id);
 		glGetTexImage(GL_TEXTURE_2D, /*mipmap level*/ 0, GL_RGB, GL_UNSIGNED_BYTE, image_data.begin());
 		//glGetTextureImage(texture.id, /*mipmap level*/ 0, GL_RGB, GL_UNSIGNED_BYTE, image_data.size(), image_data.begin());
@@ -205,38 +206,26 @@ struct GraphicsImpl {
 	ShadersInfo<TriUniforms> tri_shader_info;
 	ShadersInfo<DotUniforms> dot_shader_info;
 	// This should be as long as ModelKind has entries. (TODO: use a fixed-size array then.)
-	std::vector<RenderableModelInfo> renderable_models;
-
-	u32 model_kind_to_u32(ModelKind m) {
-		return u32(m);
-	}
+	DynArray<RenderableModelInfo> renderable_models;
 
 	void render(Slice<DrawEntity> to_draw) {
-		//glUniform3f(uniforms.uniColor.id, time - flo(time), 0.0f, 0.0f);
-		Matrices matrices = get_matrices();
-
-		//TODO: sort to_draw by the model
-
-		// In the tri pass: set stencil buffer to object_id wherever we draw a pixel.
-		//constexpr int object_id = 1; // TODO
-		//glStencilOp(/*stencil fail*/ GL_REPLACE, /*stencil pass, depth fail*/ GL_REPLACE, /*stencil pass, depth pass*/ GL_REPLACE);
-		//glStencilFunc(GL_ALWAYS, object_id, 0xff);
+		//TODO:PERF sort to_draw by the model to avoid rebinding?
 
 		enabling(GL_DEPTH_TEST, [&]() {
 			// First pass: draw to the frame buffer
-			//glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer.id);
+			glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer.id);
 			//TODO:needed?
 			glViewport(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
 
 			glClear(static_cast<uint>(GL_COLOR_BUFFER_BIT) | static_cast<uint>(GL_DEPTH_BUFFER_BIT));
 			glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
 
-			tri_shader_info.shaders.use();
-
 			// Draw triangles
 			for (const DrawEntity& d : to_draw) {
 				const RenderableModelInfo& r = renderable_models[model_kind_to_u32(d.model)];
 				r.vao_info_tris.vao.bind();
+				tri_shader_info.shaders.use();//TODO: move out?
+				Matrices matrices = get_matrices(d);
 				glUniformMatrix4fv(tri_shader_info.uniforms.u_transform.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.total));
 				r.vao_info_tris.vbo.bind();
 				glDrawArrays(GL_TRIANGLES, 0, u32_to_glsizei(r.vao_info_tris.vbo.n_vertices));
@@ -244,7 +233,7 @@ struct GraphicsImpl {
 
 			//Verified: we're indeed writing to the texture
 			if ((false)) {
-				DynArray<u8> image_data { VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 3 };
+				DynArray<u8> image_data = DynArray<u8>::uninitialized(VIEWPORT_WIDTH * VIEWPORT_HEIGHT * 3);
 				save_image(frame_buffer.output_texture, VIEWPORT_WIDTH, VIEWPORT_HEIGHT, "/home/andy/CLionProjects/myproject/texture.png");
 
 				// Reads pixels directly from frame buffer
@@ -257,17 +246,18 @@ struct GraphicsImpl {
 
 		//TODO:MOVE
 		constexpr uint MAX_MATERIALS = 5u;
+		//TODO: this should come from parsed materials file!!!
 		Material materials[MAX_MATERIALS] = {
 			// Note: first object id is 1, so this is offset.
 			// r g b r g b
 			{ glm::vec3(1.0, 1.0, 0.0), glm::vec3(1.0, 1.0, 1.0) },
 			{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 1.0) },
-			{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) },
-			{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) },
-			{ glm::vec3(0.0, 0.0, 0.0), glm::vec3(0.0, 0.0, 0.0) },
+			{ glm::vec3(1.0, 0.0, 1.0), glm::vec3(1.0, 1.0, 0.0) },
+			{ glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 1.0, 0.0) },
+			{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 0.0) },
 		};
 
-		if ((false)) {
+		if ((true)) {
 			enabling(GL_VERTEX_PROGRAM_POINT_SIZE, [&]() {
 				// Now render to screen.
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -277,13 +267,13 @@ struct GraphicsImpl {
 				glClear(static_cast<uint>(GL_COLOR_BUFFER_BIT));
 				glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
 
-				dot_shader_info.shaders.use();
-
 				for (const DrawEntity& d : to_draw) {
 					const RenderableModelInfo& r = renderable_models[model_kind_to_u32(d.model)];
 
 					const VAOInfo& dots = r.vao_info_dots;
 					dots.vao.bind();
+					dot_shader_info.shaders.use(); //TODO:MOVE out?
+					Matrices matrices = get_matrices(d);
 					glUniformMatrix4fv(dot_shader_info.uniforms.u_model.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.model));
 					glUniformMatrix4fv(dot_shader_info.uniforms.u_transform.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.total));
 					glUniform1fv(dot_shader_info.uniforms.u_materials.id, MAX_MATERIALS * sizeof(Material) / sizeof(float), reinterpret_cast<float*>(materials));
@@ -304,9 +294,8 @@ struct GraphicsImpl {
 	}
 
 	~GraphicsImpl() {
-		for (RenderableModelInfo& i : renderable_models) {
+		for (RenderableModelInfo& i : renderable_models)
 			i.free();
-		}
 		frame_buffer.free();
 
 		tri_shader_info.free();
@@ -346,43 +335,46 @@ namespace {
 				todo();
 		}
 	}
+
+	RenderableModelInfo foo(const Model& model, const Shaders& shaders_tri, const Shaders& shaders_dot) {
+		RenderableModel renderable_model = convert_model(model);
+
+		VAO vao_tris = create_and_bind_vao();
+		VBO vbo_tris = create_and_bind_vertex_buffer(renderable_model.tris);
+		set_attrib_pointers(shaders_tri, ShadersKind::Tri);
+		VAOInfo vao_info_tris { vao_tris, vbo_tris };
+
+		VAO vao_dots = create_and_bind_vao();
+		VBO vbo_dots = create_and_bind_vertex_buffer(renderable_model.dots);
+		set_attrib_pointers(shaders_dot, ShadersKind::Dot);
+		VAOInfo vao_info_dots { vao_dots, vbo_dots };
+
+		return RenderableModelInfo { std::move(renderable_model), vao_info_tris, vao_info_dots };
+	}
 }
 
-Graphics Graphics::start(const Model& model, const std::string& cwd) {
+Graphics Graphics::start(Slice<Model> models, const std::string& cwd) {
 	GLFWwindow* window = init_glfw();
 
 	init_glew();
-
-	glEnable(GL_TEXTURE_2D);
 
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(gl_debug_message_callback, nullptr);
 
 	FrameBuffer frame_buffer = create_framebuffer();
 
-	Shaders shaders_tri = init_shaders("tri", cwd, ShadersKind::Tri);
+	Shaders shaders_tri = compile_shaders("tri", cwd);
 	TriUniforms uniforms_tri { get_uniform(shaders_tri, "u_transform") };
-
-	Shaders shaders_dot = init_shaders("dot", cwd, ShadersKind::Dot);
+	Shaders shaders_dot = compile_shaders("dot", cwd);
 	DotUniforms uniforms_dot { get_uniform(shaders_dot, "u_model"), get_uniform(shaders_dot, "u_transform"), get_uniform(shaders_dot, "u_materials"), get_uniform(shaders_dot, "u_depth_texture") };
 
-	GraphicsImpl* res = new GraphicsImpl { window, frame_buffer, ShadersInfo<TriUniforms> { shaders_tri, uniforms_tri }, ShadersInfo<DotUniforms> { shaders_dot, uniforms_dot }, {} };
-
-	{
-		RenderableModel renderable_model = convert_model(model);
-
-		VAO vao_tris = create_and_bind_vao();
-		VBO vbo_tris = create_and_bind_vertex_buffer(renderable_model.tris);
-		VAOInfo vao_info_tris { vao_tris, vbo_tris };
-
-		VAO vao_dots = create_and_bind_vao();
-		VBO vbo_dots = create_and_bind_vertex_buffer(renderable_model.dots);
-		VAOInfo vao_info_dots { vao_dots, vbo_dots };
-
-		res->renderable_models.push_back(RenderableModelInfo { std::move(renderable_model), vao_info_tris, vao_info_dots });
-	}
-
-	return { res };
+	return Graphics { new GraphicsImpl {
+		window,
+		frame_buffer,
+		ShadersInfo<TriUniforms> { shaders_tri, uniforms_tri },
+		ShadersInfo<DotUniforms> { shaders_dot, uniforms_dot },
+		map<RenderableModelInfo>{}(models, [&](const Model& model) { return foo(model, shaders_tri, shaders_dot); }),
+	} };
 }
 
 bool Graphics::window_should_close() {

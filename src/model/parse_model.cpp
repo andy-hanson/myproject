@@ -6,6 +6,10 @@
 #include "../assert.h"
 
 namespace {
+	void skip_str(std::istringstream& s) {
+		std::string str;
+		s >> str;
+	}
 
 	std::string read_str(std::istringstream& s) {
 		std::string res;
@@ -141,9 +145,11 @@ Model parse_model(const char* mtl_source, const char* obj_source) {
 	skip_comments(s);
 
 	expect_str(s, "mtllib");
-	expect_str(s, "cube2.mtl");
+	// This will be xxx.mtl
+	skip_str(s);
 	expect_str(s, "o");
-	expect_str(s, "Sphere_Sphere.001");
+	// Don't really care about the name.
+	skip_str(s);
 
 	// Read vertices
 	std::vector<glm::vec3> vertices;
@@ -179,7 +185,7 @@ Model parse_model(const char* mtl_source, const char* obj_source) {
 	}
 
 	expect_str(s, "s");
-	expect_str(s, "1"); //TODO: wtf is this?
+	expect_str(s, "1"); // Indicates that it's smooth
 
 	while (true) {
 		std::string str = read_str(s);

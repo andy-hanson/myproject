@@ -33,52 +33,48 @@ namespace {
 
 		return shader_id;
 	}
+}
 
-	Shaders compile_shaders(const std::string& name, const std::string& cwd) {
-		ShaderProgram shader_program { gluint_to_u32(glCreateProgram()) };
-		check(shader_program.id != 0);
+Shaders compile_shaders(const std::string& name, const std::string& cwd) {
+	ShaderProgram shader_program { gluint_to_u32(glCreateProgram()) };
+	check(shader_program.id != 0);
 
-		std::string vs = read_file(cwd + "/shaders/" + name + ".vert");
-		std::string fs = read_file(cwd + "/shaders/" + name + ".frag");
+	std::string vs = read_file(cwd + "/shaders/" + name + ".vert");
+	std::string fs = read_file(cwd + "/shaders/" + name + ".frag");
 
-		GLuint vertex_shader_id = add_shader(shader_program, to_slice(vs), GL_VERTEX_SHADER);
-		GLuint fragment_shader_id = add_shader(shader_program, to_slice(fs), GL_FRAGMENT_SHADER);
+	GLuint vertex_shader_id = add_shader(shader_program, to_slice(vs), GL_VERTEX_SHADER);
+	GLuint fragment_shader_id = add_shader(shader_program, to_slice(fs), GL_FRAGMENT_SHADER);
 
-		GLint success = 0;
-		GLchar error_log[1024];
+	GLint success;
+	GLchar error_log[1024];
 
-		glLinkProgram(shader_program.id);
+	glLinkProgram(shader_program.id);
 
-		glGetProgramiv(shader_program.id, GL_LINK_STATUS, &success);
-		GLsizei error_log_length;
-		//TODO: #ifdef DEBUG
-		glGetProgramInfoLog(shader_program.id, sizeof(error_log), &error_log_length, error_log);
-		if (error_log_length != 0) {
-			std::cout << "Error linking shader program: " << error_log << std::endl;
-			check(false);
-		}
-		check(success == 1);
-
-		glValidateProgram(shader_program.id);
-		glGetProgramiv(shader_program.id, GL_VALIDATE_STATUS, &success);
-		//TODO: #ifdef DEBUG
-		glGetProgramInfoLog(shader_program.id, sizeof(error_log), &error_log_length, error_log);
-		if (error_log_length != 0) {
-			std::cerr << "Invalid shader program: " << error_log << std::endl;
-			todo();
-		}
-		check(success == 1);
-
-		shader_program.use();//TODO:NEEDED?
-
-		return Shaders { shader_program, vertex_shader_id, fragment_shader_id };
+	glGetProgramiv(shader_program.id, GL_LINK_STATUS, &success);
+	GLsizei error_log_length;
+	//TODO: #ifdef DEBUG
+	glGetProgramInfoLog(shader_program.id, sizeof(error_log), &error_log_length, error_log);
+	if (error_log_length != 0) {
+		std::cout << "Error linking shader program: " << error_log << std::endl;
+		check(false);
 	}
+	check(success == 1);
+
+	glValidateProgram(shader_program.id);
+	glGetProgramiv(shader_program.id, GL_VALIDATE_STATUS, &success);
+	//TODO: #ifdef DEBUG
+	glGetProgramInfoLog(shader_program.id, sizeof(error_log), &error_log_length, error_log);
+	if (error_log_length != 0) {
+		std::cerr << "Invalid shader program: " << error_log << std::endl;
+		todo();
+	}
+	check(success == 1);
+
+	return Shaders { shader_program, vertex_shader_id, fragment_shader_id };
 }
 
 //TODO:NEATER
-Shaders init_shaders(const std::string& name, const std::string& cwd, ShadersKind kind) {
-	Shaders shaders = compile_shaders(name, cwd);
-
+Shaders set_attrib_pointers(const Shaders& shaders, ShadersKind kind) {
 	uint stride = kind == ShadersKind::Tri ? sizeof(VertexAttributesTri) : sizeof(VertexAttributesDot);
 
 	auto get_attrib = [&](const char* attr_name, uint expected_index) {

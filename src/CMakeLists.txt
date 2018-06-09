@@ -71,5 +71,5 @@ add_executable(myproject
 
 	./vendor/readerwriterqueue/atomicops.h
 	./vendor/readerwriterqueue/readerwriterqueue.h
-	graphics/gl_types.h graphics/shader_utils.h graphics/shader_utils.cpp util/string.h)
+	graphics/gl_types.h graphics/shader_utils.h graphics/shader_utils.cpp util/string.h util/FixedArray.h util/MutableSlice.h util/Quaternion.h physics/Physics.h physics/Physics.cpp util/Transform.h util/UniquePtr.h)
 target_link_libraries(myproject glfw evdev OIS reactphysics3d soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})

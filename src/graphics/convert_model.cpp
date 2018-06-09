@@ -100,7 +100,7 @@ namespace {
 		double vertices_owed = 0;
 
 		uint out_i = 0;
-		DynArray<VertexAttributesDot> out { n_strokes };
+		DynArray<VertexAttributesDot> out = DynArray<VertexAttributesDot>::uninitialized(n_strokes);
 
 		for (const Face& face : m.faces) {
 			Triangle tri = face_vertices(face, m);
@@ -126,7 +126,7 @@ namespace {
 	}
 
 	DynArray<VertexAttributesTri> get_triangles(const Model& m) {
-		DynArray<VertexAttributesTri> out { m.faces.size() * 3 };
+		DynArray<VertexAttributesTri> out = DynArray<VertexAttributesTri>::uninitialized(m.faces.size() * 3);
 		uint i = 0;
 		for (const Face& face : m.faces) {
 			Triangle tri = face_vertices(face, m);

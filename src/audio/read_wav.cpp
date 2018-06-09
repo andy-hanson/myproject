@@ -12,7 +12,7 @@ DecodedAudioFile read_wav() {
 	assert_not_null(f); //else file did not exist
 	check(sf_info.channels == 2);
 
-	DecodedAudioFile res { { i64_to_u32(sf_info.frames * sf_info.channels) } };
+	DecodedAudioFile res { DynArray<float>::uninitialized(i64_to_u32(sf_info.frames * sf_info.channels)) };
 
 	sf_count_t n_read = sf_read_float(f, &res.floats[0], res.floats.size());
 	check(n_read == res.floats.size());

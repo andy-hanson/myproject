@@ -1,16 +1,18 @@
 #pragma once
 
-#include <glm/vec2.hpp>
 #include <string>
 
+#include "../util/Transform.h"
 #include "../model/Model.h"
 #include "../model/ModelKind.h"
 
-/** This is the input to the graphics system. */
+/**
+ * This is the input to the graphics system: Draw a model at a certain transform.
+ * TODO: support more properties of objects.
+ */
 struct DrawEntity {
 	ModelKind model;
-	glm::vec2 position;
-	//rp3d::Quaternion orientation;
+	Transform transform;
 };
 
 struct GraphicsImpl;
@@ -21,7 +23,7 @@ class Graphics {
 	Graphics(const Graphics& other) = delete;
 	inline Graphics(GraphicsImpl* impl) : _impl{impl} {}
 public:
-	static Graphics start(const Model& renderable_model, const std::string& cwd);
+	static Graphics start(Slice<Model> models, const std::string& cwd);
 	bool window_should_close();
 	void render(Slice<DrawEntity> to_draw);
 	~Graphics();

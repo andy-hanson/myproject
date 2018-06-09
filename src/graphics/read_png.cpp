@@ -93,7 +93,7 @@ Matrix<uint32_t> png_texture_load(const char* file_name) {
 
 	Matrix<uint32_t> image_data { width, height };
 
-	DynArray<png_bytep> row_pointers { height };
+	DynArray<png_bytep> row_pointers = DynArray<png_bytep>::uninitialized(height);
 	for (uint y = 0; y < height; y++)
 		row_pointers[y] = static_cast<png_byte*>(static_cast<void*>(image_data.row_pointer(y)));
 

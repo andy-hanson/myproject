@@ -99,7 +99,7 @@ vec3 lighting_for_light(vec3 world_pos, vec3 world_normal, Material material, ve
 }
 
 vec3 calculate_lighting(vec3 world_pos, vec3 world_normal, Material material) {
-	vec3 light_pos = vec3(-0.0, 4.0, -2.0);
+	vec3 light_pos = vec3(-0.0, 4.0, 2.0);
 	return lighting_for_light(world_pos, world_normal, material, light_pos);
 }
 

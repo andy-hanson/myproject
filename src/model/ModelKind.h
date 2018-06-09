@@ -3,8 +3,16 @@
 enum class ModelKind {
 	Player,
 
-	Stage0,
+	Cylinder,
+
+
+	// Last entry -- this is the # of models.
+	COUNT,
 };
-//We can easily map a ModelKind to the renderable model by an array lookup.
-//graphics will need to map ModelKind to the list of positions at that location.
-//So when we move an entity,
+
+const u32 N_MODELS = u32(ModelKind::COUNT);
+
+inline u32 model_kind_to_u32(ModelKind m) {
+	return u32(m);
+}
+
