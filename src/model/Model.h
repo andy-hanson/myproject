@@ -3,9 +3,11 @@
 #include <glm/vec3.hpp>
 
 #include "../util/DynArray.h"
+#include "../util/FixedArray.h"
 #include "../util/int.h"
 
 #include "./Color.h"
+#include "./ModelKind.h"
 //Note: texture and vertex indices were parsed away from 1-based. So this is 1 less than what's in the file.
 
 struct Face {

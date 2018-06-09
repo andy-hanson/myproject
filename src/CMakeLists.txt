@@ -44,13 +44,16 @@ add_executable(myproject
 	./control/Controller.h
 	./control/Controller.cpp
 
-	graphics/convert_model.cpp
-	graphics/convert_model.h
+	./graphics/convert_model.cpp
+	./graphics/convert_model.h
+	./graphics/gl_types.h
 	./graphics/Graphics.h
 	./graphics/Graphics.cpp
 	./graphics/read_png.cpp
 	./graphics/read_png.h
 	./graphics/RenderableModel.h
+	./graphics/shader_utils.h
+	./graphics/shader_utils.cpp
 
 	./model/Color.h
 	./model/Model.h
@@ -58,18 +61,29 @@ add_executable(myproject
 	./model/parse_model.cpp
 	./model/parse_model.h
 
+	./physics/Physics.h
+	./physics/Physics.cpp
+
 	./util/assert.h
 	./util/DynArray.h
+	./util/FixedArray.h
 	./util/float.h
 	./util/int.h
 	./util/io.cpp
 	./util/io.h
 	./util/math.h
 	./util/Matrix.h
+	./util/MutableSlice.h
+	./util/Quaternion.h
 	./util/Ref.h
 	./util/Slice.h
+	./util/string.h
+	./util/Transform.h
+	./util/UniquePtr.h
 
 	./vendor/readerwriterqueue/atomicops.h
 	./vendor/readerwriterqueue/readerwriterqueue.h
-	graphics/gl_types.h graphics/shader_utils.h graphics/shader_utils.cpp util/string.h util/FixedArray.h util/MutableSlice.h util/Quaternion.h physics/Physics.h physics/Physics.cpp util/Transform.h util/UniquePtr.h)
+
+	./Timer.cpp
+	./Timer.h util/FixedSizeQueue.h)
 target_link_libraries(myproject glfw evdev OIS reactphysics3d soundio sndfile vorbisfile Threads::Threads ${PNG_LIBRARY})

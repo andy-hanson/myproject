@@ -17,6 +17,7 @@ class Physics {
 
 public:
 	Physics(Slice<Model> models);
+	Physics(const Physics& other) = delete;
 	~Physics();
 
 	Ref<PhysicsBody> add_body(ModelKind model, const Transform& transform);

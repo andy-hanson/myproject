@@ -116,55 +116,6 @@ namespace {
 		//const uint SomethingYetMoreElse = 0x04;
 	};
 
-	// Note: the mesh must be convex.
-	__attribute__((unused))
-	void make_convex_mesh() {
-		// NOTE: these are *not* copied, I need to keep them alive!
-		float vertices[24] = {
-		-3, -3, 3,
-		3, -3, 3,
-		3, -3, -3,
-		-3, -3, -3,
-		-3, 3, 3,
-		3, 3, 3,
-		3, 3, -3,
-		-3, 3, -3,
-		};
-
-		// NOTE: these are *not* copied, I need to keep them alive!
-		int indices[24] = {
-		0, 3, 2, 1,
-		4, 5, 6, 7,
-		0, 1, 5, 4,
-		1, 2, 6, 5,
-		2, 3, 7, 6,
-		0, 4, 7, 3,
-		};
-
-		rp3d::PolygonVertexArray::PolygonFace polygonFaces[6];
-		// NOTE: these are *not* copied, I need to keep them alive!
-		rp3d::PolygonVertexArray::PolygonFace* face = &polygonFaces[0];
-		for (uint f = 0; f != 6; ++f) {
-			// First vertex  of the  face in the  indices  array
-			face->indexBase = f * 4;
-			// Number  of  vertices  in the  face
-			face->nbVertices = 4;
-			++face;
-		}
-
-		// NOTE: these are *not* copied, I need to keep them alive!
-		rp3d::PolygonVertexArray* polygonVertexArray = new rp3d::PolygonVertexArray(
-		8, vertices, 3 * sizeof(float), indices, sizeof(int), 6, polygonFaces,
-		rp3d::PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE,
-		rp3d::PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE);
-
-		// NOTE: these are *not* copied, I need to keep them alive!
-		rp3d::PolyhedronMesh* polyhedronMesh = new rp3d::PolyhedronMesh(polygonVertexArray);
-
-		rp3d::ConvexMeshShape* convexMeshShape __attribute__((unused)) = new rp3d::ConvexMeshShape(polyhedronMesh);
-
-		todo(); //todo: don't make invalid pointers
-	}
 
 	rp3d::Transform transform_identity() { return rp3d::Transform { rp3d::Vector3 { 0.0, 0.0, 0.0 }, rp3d::Quaternion::identity() }; }
 

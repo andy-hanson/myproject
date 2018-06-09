@@ -92,3 +92,7 @@ inline bool int_to_bool(int i) {
 	check(i == 0 || i == 1);
 	return i == 1;
 }
+
+inline int int_abs(int i) {
+	return i < 0 ? -i : i;
+}

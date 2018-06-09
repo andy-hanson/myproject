@@ -20,6 +20,7 @@
 
 #include "./util/Ref.h"
 #include "./game.h"
+#include "util/FixedSizeQueue.h"
 
 namespace {
 	template <typename Cb>
@@ -62,7 +63,5 @@ int main() {
 	if ((false)) test_sound();
 	if ((false)) test_input();
 
-
-	std::string cwd = get_current_directory();
-	game(cwd);
+	if ((true)) game(get_current_directory());
 }

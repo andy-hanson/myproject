@@ -20,9 +20,9 @@ class DynArray {
 public:
 	DynArray() : _slice{} {}
 	inline static DynArray<T> uninitialized(u32 len) { return DynArray { len }; }
-	DynArray(const DynArray& other __attribute__((unused))) : _slice{} {
-		todo(); // should be optimized away!
-	}
+	//DynArray(const DynArray& other __attribute__((unused))) : _slice{} {
+	//	todo(); // should be optimized away!
+	//}
 	void operator=(DynArray&& other) {
 		::operator delete(_slice.begin());
 		_slice = other._slice;
@@ -59,6 +59,17 @@ public:
 	inline T* begin() { return _slice.begin(); }
 	inline T* end() { return _slice.end(); }
 	inline u32 size() const { return _slice.size(); }
+};
+
+template <typename T>
+struct fill_array {
+	template <typename Cb>
+	DynArray<T> operator()(u32 size, Cb cb) {
+		DynArray<T> out = DynArray<T>::uninitialized(size);
+		for (u32 i = 0; i != size; ++i)
+			new (&out[i]) T { cb(i) };
+		return out;
+	}
 };
 
 //TODO:MOVE
