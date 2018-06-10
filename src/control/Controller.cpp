@@ -79,6 +79,8 @@ struct ControllerImpl {
 								case ABS_RY:
 								case ABS_Z: // ZL
 								case ABS_RZ: // ZR
+								case ABS_HAT0X:
+								case ABS_HAT0Y:
 									break; // ignore
 								default:
 									std::cerr << libevdev_event_code_get_name(ev.type, ev.code) << std::endl;

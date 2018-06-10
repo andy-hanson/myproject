@@ -75,7 +75,7 @@ Shaders compile_shaders(const std::string& name, const std::string& cwd) {
 
 //TODO:NEATER
 Shaders set_attrib_pointers(const Shaders& shaders, ShadersKind kind) {
-	uint stride = kind == ShadersKind::Tri ? sizeof(VertexAttributesTri) : sizeof(VertexAttributesDot);
+	uint stride = kind == ShadersKind::Tri ? sizeof(VertexAttributesTri) : sizeof(VertexAttributesDotOrDebug);
 
 	auto get_attrib = [&](const char* attr_name, uint expected_index) {
 		GLuint attrib = glint_to_gluint(glGetAttribLocation(shaders.program.id, attr_name));
@@ -100,10 +100,11 @@ Shaders set_attrib_pointers(const Shaders& shaders, ShadersKind kind) {
 			break;
 		}
 
-		case ShadersKind::Dot: {
-			vec3_attr("a_position", 0, offsetof(VertexAttributesDot, a_position));
-			vec3_attr("a_normal", 1, offsetof(VertexAttributesDot, a_normal));
-			int_attr("a_material_id", 2, offsetof(VertexAttributesDot, a_material_id));
+		case ShadersKind::Dot:
+		case ShadersKind::Debug: {
+			vec3_attr("a_position", 0, offsetof(VertexAttributesDotOrDebug, a_position));
+			vec3_attr("a_normal", 1, offsetof(VertexAttributesDotOrDebug, a_normal));
+			int_attr("a_material_id", 2, offsetof(VertexAttributesDotOrDebug, a_material_id));
 			break;
 		}
 	}

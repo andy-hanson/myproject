@@ -65,14 +65,18 @@ struct Uniform {
 	Uniform() = delete;
 };
 struct TriUniforms {
-	//Uniform uniColor;
 	Uniform u_transform;
 };
 struct DotUniforms {
 	Uniform u_model;
 	Uniform u_transform;
 	Uniform u_materials;
-	Uniform u_depth_texture;
+	Uniform u_material_id_texture;
+};
+struct DebugUniforms {
+	Uniform u_model;
+	Uniform u_transform;
+	Uniform u_materials;
 };
 
 struct Texture {

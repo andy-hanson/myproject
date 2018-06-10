@@ -15,7 +15,7 @@ struct VertexAttributesTri {
 	u32 a_material_id;
 } __attribute__((packed));
 
-struct VertexAttributesDot {
+struct VertexAttributesDotOrDebug {
 	glm::vec3 a_position;
 	glm::vec3 a_normal;
 	u32 a_material_id;
@@ -23,5 +23,7 @@ struct VertexAttributesDot {
 
 struct RenderableModel {
 	DynArray<VertexAttributesTri> tris;
-	DynArray<VertexAttributesDot> dots;
+	DynArray<VertexAttributesDotOrDebug> dots;
+	//TODO:PERF #if DEBUG
+	DynArray<VertexAttributesDotOrDebug> debug; // These are triangles, not dots. Unlike `tris` this includes lighting information and not just material_id.
 };

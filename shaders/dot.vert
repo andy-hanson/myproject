@@ -5,16 +5,16 @@ in vec3 a_normal;
 in uint a_material_id;
 
 out vec3 frag_color;
+out float frag_point_size;
 flat out uint frag_material_id;
 
-// Note: must be kept in sync with c++
+// Note: must be kept in sync with c++ (and debug.vert)
 const uint MAX_MATERIALS = 5u;
 const uint MATERIAL_SIZE_FLOATS = 6u;
 
 uniform mat4 u_model;
 uniform mat4 u_transform;
 uniform float u_materials[MAX_MATERIALS * MATERIAL_SIZE_FLOATS];
-// There's also u_depth_texture used by dot.frag
 
 // This should match what's in c++
 struct Material {
@@ -46,10 +46,6 @@ float power4(float x) {
 }
 float power5(float x) {
 	return power4(x) * x;
-}
-
-vec3 ignore(vec3 v) {
-	return v * 0.001;
 }
 
 // input and output are both fractions 0-1.
@@ -105,22 +101,22 @@ vec3 calculate_lighting(vec3 world_pos, vec3 world_normal, Material material) {
 
 void main() {
 	lowp vec3 screen_normal = normalize(vec3(u_transform * vec4(a_normal, 0.0)));
-
-	Material material = get_material();
-
 	if (screen_normal.z > 0.0) {
 		// Facing away from the camera
 		discardVertex();
 		return;
 	}
 
+	Material material = get_material();
+
 	vec3 world_pos = (u_model * vec4(a_position, 1.0)).xyz;
 	vec3 world_normal = normalize(vec3(u_model * vec4(a_normal, 0.0)));
 	vec3 lit_color = calculate_lighting(world_pos, world_normal, material);
 
-	// As screen_normal approaches 0, get smaller.
 	gl_Position = u_transform * vec4(a_position, 1.0);
+	// As screen_normal approaches 0 (facing perpendicular to screen), get smaller.
 	gl_PointSize = 100.0 * quartic_ease(-screen_normal.z);
+	frag_point_size = gl_PointSize;
 
 	frag_color = lit_color;
 	frag_material_id = a_material_id;

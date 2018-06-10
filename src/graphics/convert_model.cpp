@@ -90,7 +90,7 @@ namespace {
 		return Color { fluctuate(c.r), fluctuate(c.g), fluctuate(c.b) };
 	}
 
-	DynArray<VertexAttributesDot> gen_dots(const Model& m, Random& rand) {
+	DynArray<VertexAttributesDotOrDebug> gen_dots(const Model& m, Random& rand) {
 		double total_area = compute_total_area(m);
 
 		u32 n_strokes = 500; // TODO: configurable
@@ -100,7 +100,7 @@ namespace {
 		double vertices_owed = 0;
 
 		uint out_i = 0;
-		DynArray<VertexAttributesDot> out = DynArray<VertexAttributesDot>::uninitialized(n_strokes);
+		DynArray<VertexAttributesDotOrDebug> out = DynArray<VertexAttributesDotOrDebug>::uninitialized(n_strokes);
 
 		for (const Face& face : m.faces) {
 			Triangle tri = face_vertices(face, m);
@@ -117,7 +117,7 @@ namespace {
 			for (uint i = n_face_points; i != 0; --i) {
 				PointNormal pn = random_point_normal_in_triangle(tri, normals, rand);
 				//Color color = material.kd;//random_color_near(material.kd, rand);
-				out[out_i++] = VertexAttributesDot { pn.point, pn.normal, material.id };
+				out[out_i++] = VertexAttributesDotOrDebug { pn.point, pn.normal, material.id };
 			}
 		}
 
@@ -138,9 +138,24 @@ namespace {
 		assert(i == out.size());
 		return out;
 	};
+
+	DynArray<VertexAttributesDotOrDebug> get_debug(const Model& m) {
+		DynArray<VertexAttributesDotOrDebug> out = DynArray<VertexAttributesDotOrDebug>::uninitialized(m.faces.size() * 3);
+		uint i = 0;
+		for (const Face& face : m.faces) {
+			Triangle tri = face_vertices(face, m);
+			Normals normals = face_normals(face, m);
+			const ParsedMaterial& material = m.materials[face.material];
+			out[i++] = VertexAttributesDotOrDebug { tri.p0, normals.n0, material.id };
+			out[i++] = VertexAttributesDotOrDebug { tri.p1, normals.n1, material.id };
+			out[i++] = VertexAttributesDotOrDebug { tri.p2, normals.n2, material.id };
+		}
+		assert(i == out.size());
+		return out;
+	}
 }
 
 RenderableModel convert_model(const Model& m) {
 	Random rand;
-	return { get_triangles(m), gen_dots(m, rand) };
+	return { get_triangles(m), gen_dots(m, rand), get_debug(m) };
 };

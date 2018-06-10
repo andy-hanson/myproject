@@ -21,6 +21,7 @@ namespace {
 	//TODO: not const
 	const uint VIEWPORT_WIDTH = 1024;
 	const uint VIEWPORT_HEIGHT = 1024;
+	const uint MULTISAMPLING = 4;
 }
 
 namespace {
@@ -47,7 +48,7 @@ namespace {
 	struct Matrices {
 		glm::mat4 model;
 		glm::mat4 viewModel; // excludes proj
-		glm::mat4 total;
+		glm::mat4 transform;
 	};
 	Matrices get_matrices(const DrawEntity& to_draw) {
 		glm::mat4 model = glm::translate(glm::toMat4(to_draw.transform.quat), to_draw.transform.position); //glm::rotate(glm::mat4{}, time * glm::radians(10.0f), glm::vec3(0.0f, 0.0f, 1.0f));
@@ -136,7 +137,7 @@ namespace {
 
 namespace {
 	template <typename TVertexAttributes>
-	VBO create_and_bind_vertex_buffer(const DynArray<TVertexAttributes>& vertices) {
+	VBO create_and_bind_vertex_buffer(Slice<TVertexAttributes> vertices) {
 		GLuint vbo_id;
 		glGenBuffers(1, &vbo_id);
 		check(vbo_id != 0);
@@ -179,6 +180,12 @@ namespace {
 		cb();
 		glDisable(enabled);
 	}
+	template <typename Cb>
+	inline void enabling(GLenum a, GLenum b, Cb cb) {
+		enabling(a, [&]() {
+			enabling(b, cb);
+		});
+	}
 
 	void save_image(const Texture& texture, uint width, uint height, const char* file_name) {
 		DynArray<u8> image_data = DynArray<u8>::uninitialized(width * height * 3); // * 10 to make sure error isn't due to size
@@ -192,12 +199,21 @@ namespace {
 		RenderableModel renderable_model;
 		VAOInfo vao_info_tris;
 		VAOInfo vao_info_dots;
+		VAOInfo vao_info_debug;
 
 		void free() {
 			vao_info_tris.free();
 			vao_info_dots.free();
+			vao_info_debug.free();
 		}
 	};
+
+	void uniform_matrix(const Uniform& u, const glm::mat4 mat) {
+		glUniformMatrix4fv(u.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(mat));
+	}
+
+	// Should match what's in the shader.
+	constexpr uint MAX_MATERIALS = 5u;
 }
 
 struct GraphicsImpl {
@@ -205,12 +221,54 @@ struct GraphicsImpl {
 	FrameBuffer frame_buffer;
 	ShadersInfo<TriUniforms> tri_shader_info;
 	ShadersInfo<DotUniforms> dot_shader_info;
+	ShadersInfo<DebugUniforms> debug_shader_info;
 	// This should be as long as ModelKind has entries. (TODO: use a fixed-size array then.)
 	DynArray<RenderableModelInfo> renderable_models;
 
-	void render(Slice<DrawEntity> to_draw) {
-		//TODO:PERF sort to_draw by the model to avoid rebinding?
+	//TODO: this should come from parsed materials file!!!
+	Material materials[MAX_MATERIALS] = {
+		// Note: first material id is 1, so this is offset.
+		// r g b r g b
+		{ glm::vec3(1.0, 1.0, 0.0), glm::vec3(1.0, 1.0, 1.0) },
+		{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 1.0) },
+		{ glm::vec3(1.0, 0.0, 1.0), glm::vec3(1.0, 1.0, 0.0) },
+		{ glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 1.0, 0.0) },
+		{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 0.0) },
+	};
 
+	const RenderableModelInfo& get_model(ModelKind m) {
+		return renderable_models[model_kind_to_u32(m)];
+	}
+
+	void render_debug(Slice<DrawEntity> to_draw) {
+		enabling(GL_DEPTH_TEST, [&]() {
+			glClear(static_cast<uint>(GL_COLOR_BUFFER_BIT) | static_cast<uint>(GL_DEPTH_BUFFER_BIT));
+			glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
+
+			for (const DrawEntity& d : to_draw) {
+				const RenderableModelInfo& r = get_model(d.model);
+				r.vao_info_debug.vao.bind();
+				debug_shader_info.shaders.use();//TODO: move out?
+
+				Matrices matrices = get_matrices(d);
+
+				uniform_matrix(debug_shader_info.uniforms.u_model, matrices.model);
+				uniform_matrix(debug_shader_info.uniforms.u_transform, matrices.transform);
+				set_uniform_materials(debug_shader_info.uniforms.u_materials);
+
+				r.vao_info_debug.vbo.bind();
+				glDrawArrays(GL_TRIANGLES, 0, u32_to_glsizei(r.vao_info_debug.vbo.n_vertices));
+			}
+		});
+	}
+
+	//TODO: should only have to do this once at the beginning...
+	void set_uniform_materials(Uniform u) {
+		glUniform1fv(u.id, MAX_MATERIALS * sizeof(Material) / sizeof(float), reinterpret_cast<float*>(materials));
+	}
+
+	void render_normal(Slice<DrawEntity> to_draw) {
+		// Draw triangles
 		enabling(GL_DEPTH_TEST, [&]() {
 			// First pass: draw to the frame buffer
 			glBindFramebuffer(GL_FRAMEBUFFER, frame_buffer.id);
@@ -220,13 +278,12 @@ struct GraphicsImpl {
 			glClear(static_cast<uint>(GL_COLOR_BUFFER_BIT) | static_cast<uint>(GL_DEPTH_BUFFER_BIT));
 			glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
 
-			// Draw triangles
 			for (const DrawEntity& d : to_draw) {
-				const RenderableModelInfo& r = renderable_models[model_kind_to_u32(d.model)];
+				const RenderableModelInfo& r = get_model(d.model);
 				r.vao_info_tris.vao.bind();
 				tri_shader_info.shaders.use();//TODO: move out?
 				Matrices matrices = get_matrices(d);
-				glUniformMatrix4fv(tri_shader_info.uniforms.u_transform.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.total));
+				uniform_matrix(tri_shader_info.uniforms.u_transform, matrices.transform);
 				r.vao_info_tris.vbo.bind();
 				glDrawArrays(GL_TRIANGLES, 0, u32_to_glsizei(r.vao_info_tris.vbo.n_vertices));
 			}
@@ -244,21 +301,11 @@ struct GraphicsImpl {
 			}
 		});
 
-		//TODO:MOVE
-		constexpr uint MAX_MATERIALS = 5u;
-		//TODO: this should come from parsed materials file!!!
-		Material materials[MAX_MATERIALS] = {
-			// Note: first object id is 1, so this is offset.
-			// r g b r g b
-			{ glm::vec3(1.0, 1.0, 0.0), glm::vec3(1.0, 1.0, 1.0) },
-			{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 1.0) },
-			{ glm::vec3(1.0, 0.0, 1.0), glm::vec3(1.0, 1.0, 0.0) },
-			{ glm::vec3(0.0, 1.0, 0.0), glm::vec3(0.0, 1.0, 0.0) },
-			{ glm::vec3(0.0, 1.0, 1.0), glm::vec3(1.0, 1.0, 0.0) },
-		};
 
 		if ((true)) {
-			enabling(GL_VERTEX_PROGRAM_POINT_SIZE, [&]() {
+			enabling(GL_VERTEX_PROGRAM_POINT_SIZE, GL_BLEND, [&]() {
+				glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
 				// Now render to screen.
 				glBindFramebuffer(GL_FRAMEBUFFER, 0);
 				//TODO:needed?
@@ -268,25 +315,35 @@ struct GraphicsImpl {
 				glClearColor(0.0f, 0.0f, 0.1f, 0.0f);
 
 				for (const DrawEntity& d : to_draw) {
-					const RenderableModelInfo& r = renderable_models[model_kind_to_u32(d.model)];
+					const RenderableModelInfo& r = get_model(d.model);
 
 					const VAOInfo& dots = r.vao_info_dots;
 					dots.vao.bind();
 					dot_shader_info.shaders.use(); //TODO:MOVE out?
 					Matrices matrices = get_matrices(d);
-					glUniformMatrix4fv(dot_shader_info.uniforms.u_model.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.model));
-					glUniformMatrix4fv(dot_shader_info.uniforms.u_transform.id, 1, /*transpose*/ GL_FALSE, glm::value_ptr(matrices.total));
-					glUniform1fv(dot_shader_info.uniforms.u_materials.id, MAX_MATERIALS * sizeof(Material) / sizeof(float), reinterpret_cast<float*>(materials));
+					uniform_matrix(dot_shader_info.uniforms.u_model, matrices.model);
+					uniform_matrix(dot_shader_info.uniforms.u_transform, matrices.transform);
+					set_uniform_materials(dot_shader_info.uniforms.u_materials);
 
 					//TODO: check for error after trying to set uniform?
 					//TODO: Yes this is tricky. Have to bind a texture and set the uniform to the texture *unit*, not the texture id.
 					glBindTexture(GL_TEXTURE_2D, frame_buffer.output_texture.id);
-					glUniform1i(dot_shader_info.uniforms.u_depth_texture.id, 0);//frame_buffer.output_texture.id); //TODO: just guessing here
+					glUniform1i(dot_shader_info.uniforms.u_material_id_texture.id, 0);//frame_buffer.output_texture.id); //TODO: just guessing here
 
 					dots.vbo.bind();
 					glDrawArrays(GL_POINTS, 0, u32_to_glsizei(dots.vbo.n_vertices));
 				}
 			});
+		}
+	}
+
+	void render(Slice<DrawEntity> to_draw) {
+		//TODO:PERF sort to_draw by the model to avoid rebinding?
+
+		if ((false)) {
+			render_debug(to_draw);
+		} else {
+			render_normal(to_draw);
 		}
 
 		glfwSwapBuffers(window);
@@ -309,6 +366,7 @@ struct GraphicsImpl {
 namespace {
 	GLFWwindow* init_glfw() {
 		glfwInit();
+		glfwWindowHint(GLFW_SAMPLES, MULTISAMPLING);
 		GLFWwindow* window = glfwCreateWindow(VIEWPORT_WIDTH, VIEWPORT_HEIGHT, "My window", nullptr, nullptr);
 		assert(window != nullptr);
 		glfwMakeContextCurrent(window);
@@ -336,20 +394,23 @@ namespace {
 		}
 	}
 
-	RenderableModelInfo foo(const Model& model, const Shaders& shaders_tri, const Shaders& shaders_dot) {
+	//TODO:NAME
+	template <typename TVertexAttributes>
+	VAOInfo get_vao_info(Slice<TVertexAttributes> vertices, const Shaders& shaders, ShadersKind shaders_kind) {
+		VAO vao = create_and_bind_vao();
+		VBO vbo = create_and_bind_vertex_buffer(vertices);
+		set_attrib_pointers(shaders, shaders_kind);
+		return VAOInfo { vao, vbo };
+	}
+
+	RenderableModelInfo get_renderable_model_info(const Model& model, const Shaders& shaders_tri, const Shaders& shaders_dot, const Shaders& shaders_debug) {
 		RenderableModel renderable_model = convert_model(model);
 
-		VAO vao_tris = create_and_bind_vao();
-		VBO vbo_tris = create_and_bind_vertex_buffer(renderable_model.tris);
-		set_attrib_pointers(shaders_tri, ShadersKind::Tri);
-		VAOInfo vao_info_tris { vao_tris, vbo_tris };
+		VAOInfo vao_info_tris = get_vao_info(renderable_model.tris.slice(), shaders_tri, ShadersKind::Tri);
+		VAOInfo vao_info_dots = get_vao_info(renderable_model.dots.slice(), shaders_dot, ShadersKind::Dot);
+		VAOInfo vao_info_debug = get_vao_info(renderable_model.debug.slice(), shaders_debug, ShadersKind::Debug);
 
-		VAO vao_dots = create_and_bind_vao();
-		VBO vbo_dots = create_and_bind_vertex_buffer(renderable_model.dots);
-		set_attrib_pointers(shaders_dot, ShadersKind::Dot);
-		VAOInfo vao_info_dots { vao_dots, vbo_dots };
-
-		return RenderableModelInfo { std::move(renderable_model), vao_info_tris, vao_info_dots };
+		return RenderableModelInfo { std::move(renderable_model), vao_info_tris, vao_info_dots, vao_info_debug };
 	}
 }
 
@@ -357,6 +418,8 @@ Graphics Graphics::start(Slice<Model> models, const std::string& cwd) {
 	GLFWwindow* window = init_glfw();
 
 	init_glew();
+
+	glEnable(GL_MULTISAMPLE);
 
 	glEnable(GL_DEBUG_OUTPUT);
 	glDebugMessageCallback(gl_debug_message_callback, nullptr);
@@ -366,14 +429,17 @@ Graphics Graphics::start(Slice<Model> models, const std::string& cwd) {
 	Shaders shaders_tri = compile_shaders("tri", cwd);
 	TriUniforms uniforms_tri { get_uniform(shaders_tri, "u_transform") };
 	Shaders shaders_dot = compile_shaders("dot", cwd);
-	DotUniforms uniforms_dot { get_uniform(shaders_dot, "u_model"), get_uniform(shaders_dot, "u_transform"), get_uniform(shaders_dot, "u_materials"), get_uniform(shaders_dot, "u_depth_texture") };
+	DotUniforms uniforms_dot { get_uniform(shaders_dot, "u_model"), get_uniform(shaders_dot, "u_transform"), get_uniform(shaders_dot, "u_materials"), get_uniform(shaders_dot, "u_material_id_texture") };
+	Shaders shaders_debug = compile_shaders("debug", cwd);
+	DebugUniforms uniforms_debug { get_uniform(shaders_debug, "u_model"), get_uniform(shaders_debug, "u_transform"), get_uniform(shaders_debug, "u_materials") };
 
 	return Graphics { new GraphicsImpl {
 		window,
 		frame_buffer,
 		ShadersInfo<TriUniforms> { shaders_tri, uniforms_tri },
 		ShadersInfo<DotUniforms> { shaders_dot, uniforms_dot },
-		map<RenderableModelInfo>{}(models, [&](const Model& model) { return foo(model, shaders_tri, shaders_dot); }),
+		ShadersInfo<DebugUniforms> { shaders_debug, uniforms_debug },
+		map<RenderableModelInfo>{}(models, [&](const Model& model) { return get_renderable_model_info(model, shaders_tri, shaders_dot, shaders_debug); }),
 	} };
 }
 

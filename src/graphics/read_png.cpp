@@ -97,7 +97,7 @@ Matrix<uint32_t> png_texture_load(const char* file_name) {
 	for (uint y = 0; y < height; y++)
 		row_pointers[y] = static_cast<png_byte*>(static_cast<void*>(image_data.row_pointer(y)));
 
-	png_read_image(png_ptr, row_pointers.slice().begin());
+	png_read_image(png_ptr, row_pointers.mutable_slice().begin());
 
 	// clean up
 	png_destroy_read_struct(&png_ptr, &info_ptr, &end_info);

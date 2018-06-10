@@ -43,7 +43,7 @@ public:
 		return ret;
 	}
 
-	MutableSlice<T> slice() { return _slice; }
+	MutableSlice<T> mutable_slice() { return _slice; }
 	Slice<T> slice() const { return _slice; }
 
 	//TODO: kill and make them cast to slice?
